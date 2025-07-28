@@ -1,0 +1,293 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+  }
+
+
+.waveform-container {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.three-container {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.analyzer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.audio-feature {
+  position: relative;
+  padding: 1rem;
+  border-radius: 8px;
+  background: hsl(var(--secondary));
+  transition: all 0.2s ease;
+}
+
+.audio-feature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.visualization-container {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Editor Layout Styles */
+.blender-editor {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 14rem);
+  background-color: hsl(var(--background));
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.editor-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editor-sidebar {
+  width: 240px;
+  background-color: hsl(var(--secondary) / 0.2);
+  border-right: 1px solid hsl(var(--border));
+  overflow-y: auto;
+}
+
+.editor-main {
+  flex: 1;
+  background-color: hsl(var(--background) / 0.8);
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-right-sidebar {
+  width: 280px;
+  background-color: hsl(var(--secondary) / 0.2);
+  border-left: 1px solid hsl(var(--border));
+  overflow-y: auto;
+}
+
+.editor-toolbar {
+  height: 48px;
+  background-color: hsl(var(--secondary) / 0.3);
+  border-top: 1px solid hsl(var(--border));
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+}
+
+.tooltip {
+  position: absolute;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.feature-marker {
+  position: absolute;
+  width: 2px;
+  background: hsl(var(--primary));
+  z-index: 10;
+  cursor: pointer;
+}
+
+.feature-marker::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 10px;
+  height: 10px;
+  background: hsl(var(--primary));
+  border-radius: 50%;
+}
+
+/* Knob Styles */
+.knob-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.knob {
+  position: relative;
+  border-radius: 50%;
+  cursor: pointer;
+  background: hsl(var(--secondary));
+  border: 2px solid hsl(var(--border));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.1s ease;
+}
+
+.knob-active {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.5), 
+              inset 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.knob-label {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-bottom: 2px;
+  text-align: center;
+}
+
+.knob-value {
+  font-size: 0.75rem;
+  margin-top: 2px;
+  text-align: center;
+}
+
+/* Scene Mode Switcher */
+.scene-mode-switch {
+  display: flex;
+  align-items: center;
+  background: hsl(var(--secondary) / 0.3);
+  border-radius: 9999px;
+  padding: 2px;
+  position: relative;
+  width: fit-content;
+  border: 1px solid hsl(var(--border));
+}
+
+.scene-mode-option {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: color 0.2s ease;
+}
+
+.scene-mode-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  height: calc(100% - 4px);
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+  transition: all 0.2s ease;
+}
+
+.scene-mode-switch[data-state="mathematical"]::after {
+  width: calc(50% - 2px);
+  transform: translateX(0);
+}
+
+.scene-mode-switch[data-state="cinematic"]::after {
+  width: calc(50% - 2px);
+  transform: translateX(100%);
+}
+
+.scene-mode-option[data-active="true"] {
+  color: hsl(var(--primary-foreground));
+}
+
+/* Features Panel */
+.features-panel {
+  background: hsl(var(--secondary) / 0.3);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  margin-top: 1rem;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+}
+
+.feature-item:last-child {
+  border-bottom: none;
+}
+
+.feature-icon {
+  font-size: 1rem;
+  opacity: 0.7;
+}
