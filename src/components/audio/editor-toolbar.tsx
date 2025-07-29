@@ -25,30 +25,8 @@ export function EditorToolbar({
   totalDuration = 0
 }: EditorToolbarProps) {
   return (
-    <div className="bg-secondary/30 border-t border-border h-12 flex items-center px-4">
+    <div className="bg-secondary/30 border-t border-border h-14 flex items-center px-4 justify-between">
       <div className="flex items-center space-x-4 text-sm">
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-muted-foreground">View:</span>
-          <Button 
-            variant={visualizationMode === 'frequency' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => onVisualizationModeChange('frequency')}
-            className="h-7 px-2 text-xs"
-          >
-            Frequency
-          </Button>
-          <Button 
-            variant={visualizationMode === 'waveform' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => onVisualizationModeChange('waveform')}
-            className="h-7 px-2 text-xs"
-          >
-            Waveform
-          </Button>
-        </div>
-        
-        <div className="h-6 w-px bg-border"></div>
-        
         <div className="flex items-center space-x-2">
           <span className="text-xs text-muted-foreground">Playback Speed:</span>
           <select 
@@ -70,6 +48,28 @@ export function EditorToolbar({
           <span className="text-xs font-mono">{formatTime(currentTime)}</span>
           <span className="text-xs text-muted-foreground">/</span>
           <span className="text-xs font-mono">{formatTime(totalDuration)}</span>
+        </div>
+      </div>
+      
+      <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2">
+          <span className="text-xs text-muted-foreground">Visualization:</span>
+          <Button 
+            variant={visualizationMode === 'frequency' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => onVisualizationModeChange('frequency')}
+            className="h-7 px-3 text-xs"
+          >
+            Frequency
+          </Button>
+          <Button 
+            variant={visualizationMode === 'waveform' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => onVisualizationModeChange('waveform')}
+            className="h-7 px-3 text-xs"
+          >
+            Waveform
+          </Button>
         </div>
       </div>
     </div>

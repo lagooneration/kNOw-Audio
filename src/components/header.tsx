@@ -17,6 +17,11 @@ export function Header() {
                 </Link>
               </li>
               <li>
+                <Link to="/mixing" className="hover:text-primary transition-colors">
+                  Mixing
+                </Link>
+              </li>
+              <li>
                 <Link to="/editor" className="hover:text-primary transition-colors">
                   3D Editor
                 </Link>

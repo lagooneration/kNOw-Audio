@@ -89,9 +89,10 @@ interface CinematicSceneProps {
     filter: boolean;
   };
   analyzer: Tone.Analyser | null;
+  isPlaying?: boolean;
 }
 
-export function CinematicScene({ effects, analyzer }: CinematicSceneProps) {
+export function CinematicScene({ effects, analyzer, isPlaying = true }: CinematicSceneProps) {
   const shaderMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
   const sphereRef = useRef<THREE.Mesh | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
@@ -291,6 +292,23 @@ export function CinematicScene({ effects, analyzer }: CinematicSceneProps) {
     
     // Update shader time uniform
     shaderMaterial.uniforms.time.value = clock.getElapsedTime();
+    
+    // Stop visualization if audio is paused
+    if (!isPlaying) {
+      // Set low audio intensity when paused for static display
+      if (shaderMaterial.uniforms.audioIntensity.value > 0.1) {
+        shaderMaterial.uniforms.audioIntensity.value = 0.1;
+      }
+      
+      // Reset sphere rotation to a static position
+      sphere.rotation.x = 0.1;
+      sphere.rotation.y = 0.1;
+      
+      // Keep particles static
+      particles.rotation.y = 0;
+      
+      return; // Skip the rest of the animation when paused
+    }
     
     // Animate the sphere with subtle movements
     sphere.rotation.x = Math.sin(clock.getElapsedTime() * 0.3) * 0.2;

@@ -3,10 +3,11 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { type AudioData } from '../../types/audio';
+import { spectralVertexShader, spectralFragmentShader } from '../../utils/audio-shaders';
 
 interface AudioVisualizerProps {
   audioData: AudioData;
-  mode?: 'frequency' | 'waveform' | '3d';
+  mode?: 'frequency' | 'waveform' | '3d' | 'spectral';
   color?: string;
   backgroundColor?: string;
 }
@@ -35,7 +36,7 @@ export function AudioVisualizer({
 
 interface AudioVisualizationProps {
   audioData: AudioData;
-  mode: 'frequency' | 'waveform' | '3d';
+  mode: 'frequency' | 'waveform' | '3d' | 'spectral';
   color: string;
 }
 
@@ -102,7 +103,29 @@ function AudioVisualization({ audioData, mode, color }: AudioVisualizationProps)
     const analyzer = analyzerRef.current;
     const bufferLength = analyzer.frequencyBinCount;
     
-    if (mode === 'frequency' || mode === '3d') {
+    if (mode === 'spectral') {
+      // Create a spectral plane with shader material
+      const planeGeometry = new THREE.PlaneGeometry(20, 20, 64, 64);
+      
+      const uniforms = {
+        u_time: { value: 0.0 },
+        u_amplitude: { value: 3.0 },
+        u_audio_data: { value: Array(64).fill(0) },
+      };
+      
+      const planeMaterial = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: spectralVertexShader,
+        fragmentShader: spectralFragmentShader,
+        wireframe: true,
+        transparent: true,
+      });
+      
+      const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+      planeMesh.rotation.x = -Math.PI / 2 + Math.PI / 4; // Rotate for better viewing angle
+      scene.add(planeMesh);
+      
+    } else if (mode === 'frequency' || mode === '3d') {
       // Create frequency bars
       const group = new THREE.Group();
       const barMaterial = new THREE.MeshStandardMaterial({
@@ -149,7 +172,24 @@ function AudioVisualization({ audioData, mode, color }: AudioVisualizationProps)
     const analyzer = analyzerRef.current;
     const dataArray = dataArrayRef.current;
     
-    if (mode === 'frequency' || mode === '3d') {
+    if (mode === 'spectral') {
+      // Update spectral plane with audio data
+      analyzer.getByteFrequencyData(dataArray);
+      
+      scene.children.forEach(child => {
+        if (child instanceof THREE.Mesh && child.material instanceof THREE.ShaderMaterial) {
+          // Update shader uniforms
+          child.material.uniforms.u_time.value += 0.1;
+          
+          // Map audio data to shader array
+          const audioDataArray = Array.from(dataArray.slice(0, 64)).map(v => v / 255.0);
+          child.material.uniforms.u_audio_data.value = audioDataArray;
+          
+          // Add some dynamic movement
+          child.rotation.z = Math.sin(Date.now() * 0.0005) * 0.1;
+        }
+      });
+    } else if (mode === 'frequency' || mode === '3d') {
       // Update frequency bars
       analyzer.getByteFrequencyData(dataArray);
       

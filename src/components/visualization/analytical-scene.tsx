@@ -32,22 +32,29 @@ const spectralFragmentShader = `
     float frequency = vUv.x; // Normalize to 0-1 range
     vec3 freqColor;
     
-    // Use hue to represent frequency (red: 0.0, violet: 0.75)
-    freqColor = hsl2rgb(vec3(frequency * 0.75, 0.8, 0.5));
+    // Spectral color gradient based on elevation and frequency
+    float hue = mix(0.0, 0.75, frequency); // Red to Violet
+    float saturation = 0.8;
+    float lightness = 0.4 + vElevation * 0.3; // Higher elevation is brighter
+    freqColor = hsl2rgb(vec3(hue, saturation, lightness));
     
-    // Add grid pattern for data visualization
+    // Add topographic-like contour lines based on elevation
+    float contourLines = step(0.98, mod(vElevation * 10.0, 1.0)) * 0.15;
+    
+    // Add grid pattern for data visualization - fixed grid
     float gridX = step(0.98, mod(vUv.x * 20.0, 1.0));
     float gridZ = step(0.98, mod(vPosition.z * 5.0, 1.0));
     float grid = max(gridX, gridZ) * 0.2;
     
-    // Apply elevation highlighting
-    float elevationHighlight = smoothstep(0.0, 1.0, vElevation * 2.0) * 0.3;
-    
-    // Combine all elements
-    vec3 color = mix(freqColor, baseColor, 0.2);
+    // Combine all elements for a spectral mountain visualization
+    vec3 color = freqColor;
     color += vec3(grid);
-    color += vec3(elevationHighlight);
-    color *= 1.0 + audioValue * audioIntensity;
+    color += vec3(contourLines);
+    
+    // Add highlight at higher elevations to simulate snow caps or light reflection
+    if (vElevation > 0.5) {
+      color = mix(color, vec3(1.0, 1.0, 1.0), (vElevation - 0.5) * 0.8);
+    }
     
     // Final color with analytical visualization appearance
     gl_FragColor = vec4(color, 1.0);
@@ -76,7 +83,14 @@ const spectralVertexShader = `
     if (audioIntensity > 0.1) {
       // Map x position to frequency band and z position to time/frame
       float frequencyResponse = audioValue * (1.0 - abs(position.x) * 0.5);
-      elevation = frequencyResponse * 4.0 * audioIntensity;
+      
+      // Calculate the base elevation for this position
+      float baseElevation = position.z < 0.0 ? 
+                           frequencyResponse * 4.0 * audioIntensity * (1.0 + position.z) : 
+                           frequencyResponse * 4.0 * audioIntensity;
+      
+      // Create mountain-like extrusion
+      elevation = baseElevation * (1.0 - abs(position.z) * 0.5);
     }
     
     // Set the vertex elevation
@@ -96,9 +110,10 @@ interface AnalyticalSceneProps {
     filter: boolean;
   };
   analyzer: Tone.Analyser | null;
+  isPlaying?: boolean;
 }
 
-export function AnalyticalScene({ effects, analyzer }: AnalyticalSceneProps) {
+export function AnalyticalScene({ effects, analyzer, isPlaying = true }: AnalyticalSceneProps) {
   const spectrogramRef = useRef<THREE.Mesh | null>(null);
   const shaderMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
   const gridRef = useRef<THREE.GridHelper | null>(null);
@@ -106,6 +121,7 @@ export function AnalyticalScene({ effects, analyzer }: AnalyticalSceneProps) {
   const localAnalyzerRef = useRef<Tone.Analyser | null>(null);
   const prevSpectrumRef = useRef<Float32Array | null>(null);
   const frameCountRef = useRef(0);
+  const referenceLineRef = useRef<THREE.Line | null>(null);
   const graphDataRef = useRef<any>({
     nodes: [],
     links: []
@@ -212,17 +228,26 @@ export function AnalyticalScene({ effects, analyzer }: AnalyticalSceneProps) {
     shaderMaterialRef.current = shaderMaterial;
     
     // Create 3D spectrogram surface
-    const spectrogramGeometry = new THREE.PlaneGeometry(8, 4, 128, 64);
-    spectrogramGeometry.rotateX(-Math.PI / 4); // Tilt for better visibility
+    const spectrogramGeometry = new THREE.PlaneGeometry(8, 6, 128, 64);
+    spectrogramGeometry.rotateX(-Math.PI / 3); // Steeper tilt for mountain-like appearance
     const spectrogram = new THREE.Mesh(spectrogramGeometry, shaderMaterial);
     spectrogram.position.z = -2;
-    spectrogram.position.y = -1;
+    spectrogram.position.y = -1.5;
     spectrogramRef.current = spectrogram;
     
-    // Create grid helper for analytical look
+    // Create grid helper for analytical look - static grid
     const gridHelper = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
     gridHelper.position.y = -2;
     gridRef.current = gridHelper;
+    
+    // Add a reference line at the front of the spectrogram - will be added to scene later
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-4, -1.5, 1),
+      new THREE.Vector3(4, -1.5, 1)
+    ]);
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x88ff88, linewidth: 2 });
+    const referenceLine = new THREE.Line(lineGeometry, lineMaterial);
+    referenceLineRef.current = referenceLine;
     
     // Initialize 3D force graph
     const forceGraph = new ThreeForceGraph()
@@ -248,6 +273,14 @@ export function AnalyticalScene({ effects, analyzer }: AnalyticalSceneProps) {
       
       if (shaderMaterial) {
         shaderMaterial.dispose();
+      }
+      
+      if (lineGeometry) {
+        lineGeometry.dispose();
+      }
+      
+      if (lineMaterial) {
+        lineMaterial.dispose();
       }
     };
   }, [uniforms, analyzer, graphDataRef]);
@@ -286,6 +319,7 @@ export function AnalyticalScene({ effects, analyzer }: AnalyticalSceneProps) {
     const grid = gridRef.current;
     const shaderMaterial = shaderMaterialRef.current;
     const forceGraph = forceGraphRef.current;
+    const referenceLine = referenceLineRef.current;
     
     // Add objects to scene if not already added
     if (!scene.children.includes(spectrogram)) {
@@ -301,8 +335,37 @@ export function AnalyticalScene({ effects, analyzer }: AnalyticalSceneProps) {
       forceGraph.position.set(0, 2, 0); // Position above the spectrogram
     }
     
+    // Add reference line if it exists and is not already in the scene
+    if (referenceLine && !scene.children.includes(referenceLine)) {
+      scene.add(referenceLine);
+    }
+    
     // Update time uniform
     shaderMaterial.uniforms.time.value = clock.getElapsedTime();
+    
+    // Stop visualization if audio is paused
+    if (!isPlaying) {
+      // Reset visual elements to static state when paused
+      if (shaderMaterial.uniforms.audioIntensity.value > 0.1) {
+        shaderMaterial.uniforms.audioIntensity.value = 0.1;
+      }
+      grid.position.y = -2; // Reset grid position
+      
+      // Reset force graph nodes to neutral position
+      const graphData = graphDataRef.current;
+      if (graphData.nodes) {
+        for (let i = 0; i < graphData.nodes.length; i++) {
+          const node = graphData.nodes[i];
+          if (node) {
+            node.y = 0.01; // Almost flat but not completely to keep some dimension
+            node.amplitude = 0.01;
+          }
+        }
+        forceGraph.graphData(graphData);
+      }
+      
+      return; // Skip the rest of the animation loop when paused
+    }
     
     // Get the appropriate analyzer
     const activeAnalyzer = analyzer || localAnalyzerRef.current;
@@ -379,9 +442,11 @@ export function AnalyticalScene({ effects, analyzer }: AnalyticalSceneProps) {
         }
         
         // Low frequency impact visualization
-        if (tonalityInfo.lowFrequencyImpact > 0.1) {
-          // Make the grid pulse with low frequency content
-          grid.position.y = -2 + Math.sin(clock.getElapsedTime() * 4) * tonalityInfo.lowFrequencyImpact * 0.1;
+        if (isPlaying && tonalityInfo.lowFrequencyImpact > 0.1) {
+          // Only apply subtle visual effects to the shader, not the grid
+          shaderMaterial.uniforms.audioIntensity.value = 0.5 + tonalityInfo.lowFrequencyImpact * 0.3;
+          // Keep grid static
+          grid.position.y = -2;
         } else {
           grid.position.y = -2;
         }

@@ -11,7 +11,8 @@ import { AudioMetadataDisplay } from '../components/audio/metadata-display';
 import { AnalysisResults } from '../components/audio/analysis-results';
 import { AudioVisualizer } from '../components/visualization/audio-visualizer-3d';
 import { useAudioProcessing } from '../hooks/use-audio-processing';
-import { type AudioData } from '../types/audio';
+import DarkVeil from '../components/ui/DarkVeil';
+import MagicBento from '../components/ui/MagicBento';
 
 export function HomePage() {
   const { audioData, isProcessing, processAudio } = useAudioProcessing();
@@ -33,14 +34,47 @@ export function HomePage() {
   };
 
   return (
-    <Container>
-      <div className="max-w-5xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-4">Audio Analyzer</h1>
-          <p className="text-muted-foreground mb-8">
-            Upload an audio file to analyze its properties and visualize its content.
-          </p>
-        </div>
+    <div className="relative min-h-screen">
+      {/* DarkVeil as background */}
+      <div className="fixed inset-0 z-0">
+        <DarkVeil />
+      </div>
+      
+      <Container className="relative z-10">
+        <div className="max-w-5xl mx-auto space-y-8 py-8">
+          <div className='text-center mb-8'>
+            <h1 className="text-3xl font-regular mb-4">kNOw Audio</h1>
+            <p className="text-muted-foreground mb-8">
+              Upload an audio file to analyze its properties and visualize its content.
+            </p>
+          </div>
+
+          <div className="mb-8 min-h-[400px] flex items-center">
+            <div className="w-full flex items-center justify-center">
+            <MagicBento 
+              textAutoHide={true}
+              enableStars={true}
+              enableSpotlight={true}
+              enableBorderGlow={true}
+              enableTilt={true}
+              enableMagnetism={true}
+              clickEffect={true}
+              spotlightRadius={300}
+              particleCount={12}
+              glowColor="132, 0, 255"
+              onCardClick={(index) => {
+                if (index === 0) {
+                  // Already on the analyzer page, just scroll to content
+                  window.scrollTo({ top: 500, behavior: "smooth" });
+                } else if (index === 1) {
+                  navigate('/editor');
+                } else if (index === 2) {
+                  navigate('/mixing');
+                }
+              }}
+            />
+            </div>
+          </div>
         
         {!audioData ? (
           <FileUpload 
@@ -125,7 +159,7 @@ export function HomePage() {
                 {activeVisualization === '3d' && (
                   <AudioVisualizer 
                     audioData={audioData} 
-                    mode="3d" 
+                    mode="spectral" 
                   />
                 )}
               </CardContent>
@@ -144,7 +178,8 @@ export function HomePage() {
             </div>
           </div>
         )}
-      </div>
-    </Container>
+        </div>
+      </Container>
+    </div>
   );
 }

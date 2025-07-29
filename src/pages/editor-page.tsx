@@ -2,6 +2,7 @@ import { Container } from '../components/ui/container';
 import { FileUpload } from '../components/audio/file-upload';
 import { AudioEditor } from '../components/audio/audio-editor';
 import { useAudioProcessing } from '../hooks/use-audio-processing';
+import DarkVeil from '../components/ui/DarkVeil';
 
 export function EditorPage() {
   const { audioData, isProcessing, processAudio } = useAudioProcessing();
@@ -15,8 +16,14 @@ export function EditorPage() {
   };
 
   return (
-    <Container>
-      <div className="mx-auto space-y-4">
+    <div className="relative min-h-screen">
+      {/* DarkVeil as background */}
+      <div className="fixed inset-0 z-0">
+        <DarkVeil />
+      </div>
+      
+      <Container className="relative z-10">
+        <div className="mx-auto space-y-4 py-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">3D Audio Editor</h1>
           <p className="text-muted-foreground">
@@ -35,6 +42,7 @@ export function EditorPage() {
           </div>
         )}
       </div>
-    </Container>
+      </Container>
+    </div>
   );
 }

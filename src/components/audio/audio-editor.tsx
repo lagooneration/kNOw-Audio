@@ -296,6 +296,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
                 effects={effects} 
                 visualizationType={visualizationType}
                 analyzer={analyzerRef.current}
+                isPlaying={isPlaying}
               />
             </div>
           </div>
@@ -332,9 +333,10 @@ interface AudioEditor3DProps {
   };
   visualizationType: 'mathematical' | 'cinematic';
   analyzer: Tone.Analyser | null;
+  isPlaying: boolean;
 }
 
-function AudioEditor3D({ effects, visualizationType, analyzer }: AudioEditor3DProps) {
+function AudioEditor3D({ effects, visualizationType, analyzer, isPlaying }: AudioEditor3DProps) {
   return (
     <div className="three-container h-full">
       <Canvas camera={{ position: [0, 0, 15], fov: 60 }}>
@@ -342,8 +344,8 @@ function AudioEditor3D({ effects, visualizationType, analyzer }: AudioEditor3DPr
         <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
         <pointLight position={[-10, -10, -10]} intensity={1} />
         {visualizationType === 'cinematic' 
-          ? <CinematicScene effects={effects} analyzer={analyzer} />
-          : <AnalyticalScene effects={effects} analyzer={analyzer} />
+          ? <CinematicScene effects={effects} analyzer={analyzer} isPlaying={isPlaying} />
+          : <AnalyticalScene effects={effects} analyzer={analyzer} isPlaying={isPlaying} />
         }
         <OrbitControls enableZoom={true} enablePan={true} />
       </Canvas>

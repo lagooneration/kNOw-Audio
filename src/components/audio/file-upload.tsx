@@ -1,6 +1,4 @@
 import { useRef, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
 
 interface FileUploadProps {
   onFileSelected: (file: File) => void;
@@ -67,74 +65,62 @@ export function FileUpload({
     onFileSelected(file);
   };
 
-  const handleButtonClick = () => {
-    if (inputRef.current) {
-      inputRef.current.click();
-    }
-  };
-
   return (
-    <Card className={`border-2 ${dragActive ? 'border-primary' : 'border-dashed'} transition-colors`}>
-      <CardHeader>
-        <CardTitle>Upload Audio File</CardTitle>
-        <CardDescription>
-          Drag and drop your audio file here or click to browse
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent>
-        <div
-          className={`
-            flex flex-col items-center justify-center p-8 rounded-md
-            ${dragActive ? 'bg-primary/10' : 'bg-secondary/50'} 
-            transition-colors
-          `}
-          onDragEnter={handleDrag}
-          onDragOver={handleDrag}
-          onDragLeave={handleDrag}
-          onDrop={handleDrop}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-12 w-12 text-muted-foreground mb-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-            />
-          </svg>
-          
-          <p className="text-lg text-center mb-4">
-            {isProcessing ? 'Processing audio file...' : 'Upload audio to analyze'}
-          </p>
-          
-          {error && (
-            <p className="text-destructive mb-4">{error}</p>
-          )}
-          
-          <input
-            type="file"
-            ref={inputRef}
-            className="hidden"
-            accept={accept}
-            onChange={handleFileChange}
-            disabled={isProcessing}
-          />
-          
-          <Button
-            onClick={handleButtonClick}
-            disabled={isProcessing}
-            className="w-full max-w-xs"
-          >
-            {isProcessing ? 'Processing...' : 'Select File'}
-          </Button>
+    <div className="group/dropzone">
+      <div
+        className={`
+          relative rounded-xl border-2 border-dashed p-8 transition-colors
+          ${dragActive ? 'border-cyan-500/50' : 'border-slate-700'} 
+          bg-slate-900/50 group-hover/dropzone:border-cyan-500/50
+        `}
+        onDragEnter={handleDrag}
+        onDragOver={handleDrag}
+        onDragLeave={handleDrag}
+        onDrop={handleDrop}
+      >
+        <input
+          type="file"
+          ref={inputRef}
+          className="absolute inset-0 z-50 h-full w-full cursor-pointer opacity-0"
+          accept={accept}
+          onChange={handleFileChange}
+          disabled={isProcessing}
+        />
+        
+        <div className="space-y-6 text-center">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-slate-900">
+            <svg
+              className="h-10 w-10 text-cyan-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-base font-medium text-white">
+              {isProcessing ? 'Processing audio file...' : 'Drop your audio here or browse'}
+            </p>
+            <p className="text-sm text-slate-400">
+              Support files: MP3, WAV, OGG, FLAC
+            </p>
+            <p className="text-xs text-slate-400">
+              Max file size: {Math.round(maxSize / (1024 * 1024))}MB
+            </p>
+            
+            {error && (
+              <p className="text-red-500 font-medium">{error}</p>
+            )}
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
