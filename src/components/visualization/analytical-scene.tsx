@@ -1,80 +1,87 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
+import ThreeForceGraph from 'three-forcegraph';
 import * as Tone from 'tone';
+import { analyzeTonality, frequencyToColor, analyzeSpectralFeatures } from '../../utils/audio-analysis';
 
-// Fragment shader for analytical audio visualization
-const analyticalFragmentShader = `
+// Fragment shader for spectral analysis visualization
+const spectralFragmentShader = `
   uniform float time;
   uniform float audioIntensity;
-  uniform vec3 baseColor;
   uniform sampler2D audioTexture;
+  uniform vec3 baseColor;
   varying vec2 vUv;
   varying float vElevation;
+  varying vec3 vPosition;
+
+  // HSL to RGB conversion
+  vec3 hsl2rgb(vec3 hsl) {
+    vec3 rgb = clamp(abs(mod(hsl.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+    return hsl.z + hsl.y * (rgb - 0.5) * (1.0 - abs(2.0 * hsl.z - 1.0));
+  }
 
   void main() {
-    // Get audio data from texture
+    // Get audio data from textures
     float audioValue = texture2D(audioTexture, vec2(vUv.x, 0.0)).r;
     
-    // Create a more analytical visualization with grids and precision
-    vec3 color = baseColor;
+    // Calculate frequency-based color
+    // Lower frequencies (red) at lower x, higher frequencies (blue/violet) at higher x
+    float frequency = vUv.x; // Normalize to 0-1 range
+    vec3 freqColor;
     
-    // Add grid pattern
+    // Use hue to represent frequency (red: 0.0, violet: 0.75)
+    freqColor = hsl2rgb(vec3(frequency * 0.75, 0.8, 0.5));
+    
+    // Add grid pattern for data visualization
     float gridX = step(0.98, mod(vUv.x * 20.0, 1.0));
-    float gridY = step(0.98, mod(vUv.y * 20.0, 1.0));
-    float grid = max(gridX, gridY) * 0.2;
+    float gridZ = step(0.98, mod(vPosition.z * 5.0, 1.0));
+    float grid = max(gridX, gridZ) * 0.2;
     
-    // Add horizontal frequency bands
-    float bands = step(0.97, mod(vUv.y * 10.0, 1.0)) * 0.3;
+    // Apply elevation highlighting
+    float elevationHighlight = smoothstep(0.0, 1.0, vElevation * 2.0) * 0.3;
     
-    // Add elevation-based coloring
-    float elevation = smoothstep(-0.5, 0.5, vElevation);
-    color = mix(color, vec3(1.0, 1.0, 1.0), elevation * 0.3);
+    // Combine all elements
+    vec3 color = mix(freqColor, baseColor, 0.2);
+    color += vec3(grid);
+    color += vec3(elevationHighlight);
+    color *= 1.0 + audioValue * audioIntensity;
     
-    // Apply audio intensity
-    color = mix(color, vec3(1.0, 1.0, 1.0), audioValue * audioIntensity * 0.4);
-    
-    // Add grid and bands
-    color += vec3(grid + bands);
-    
-    // Add subtle time-based variation
-    color += vec3(sin(time * 0.5) * 0.05);
-    
+    // Final color with analytical visualization appearance
     gl_FragColor = vec4(color, 1.0);
   }
 `;
 
-// Vertex shader for analytical audio visualization
-const analyticalVertexShader = `
-  varying vec2 vUv;
-  varying float vElevation;
+// Vertex shader for spectral analysis visualization
+const spectralVertexShader = `
   uniform float time;
   uniform float audioIntensity;
   uniform sampler2D audioTexture;
+  varying vec2 vUv;
+  varying float vElevation;
+  varying vec3 vPosition;
   
   void main() {
     vUv = uv;
+    vPosition = position;
     
-    // Get audio data from texture for this vertex
+    // Get audio data at this frequency (x position mapped to frequency)
     float audioValue = texture2D(audioTexture, vec2(position.x * 0.5 + 0.5, 0.0)).r;
-    float frequency = position.x * 0.5 + 0.5; // Normalized frequency (0-1)
     
-    // Apply precise audio data mapping to create a spectral visualization
-    vec3 newPosition = position;
-    
-    // Calculate elevation based on audio spectrum
+    // Calculate elevation based on audio data and position
     float elevation = 0.0;
+    
     if (audioIntensity > 0.1) {
-      // More precise frequency response visualization
-      float spectrum = audioValue * audioIntensity * (1.0 - frequency * 0.5);
-      elevation = spectrum * 2.0;
-      
-      // Add mathematical visualization elements
-      elevation += sin(position.x * 10.0 + time) * 0.05; // Add sine wave pattern
-      
-      newPosition.z += elevation;
+      // Map x position to frequency band and z position to time/frame
+      float frequencyResponse = audioValue * (1.0 - abs(position.x) * 0.5);
+      elevation = frequencyResponse * 4.0 * audioIntensity;
     }
     
+    // Set the vertex elevation
+    vec3 newPosition = position;
+    newPosition.y = elevation;
     vElevation = elevation;
     
     gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
@@ -88,21 +95,78 @@ interface AnalyticalSceneProps {
     distortion: boolean;
     filter: boolean;
   };
+  analyzer: Tone.Analyser | null;
 }
 
-export function AnalyticalScene({ effects }: AnalyticalSceneProps) {
+export function AnalyticalScene({ effects, analyzer }: AnalyticalSceneProps) {
+  const spectrogramRef = useRef<THREE.Mesh | null>(null);
   const shaderMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
   const gridRef = useRef<THREE.GridHelper | null>(null);
-  const meshRef = useRef<THREE.Mesh | null>(null);
-  const axesRef = useRef<THREE.AxesHelper | null>(null);
-  const analyzerRef = useRef<Tone.Analyser | null>(null);
-  const freqBarsRef = useRef<THREE.InstancedMesh | null>(null);
+  const forceGraphRef = useRef<ThreeForceGraph | null>(null);
+  const localAnalyzerRef = useRef<Tone.Analyser | null>(null);
+  const prevSpectrumRef = useRef<Float32Array | null>(null);
+  const frameCountRef = useRef(0);
+  const graphDataRef = useRef<any>({
+    nodes: [],
+    links: []
+  });
   
-  // Create a data texture for audio data
+  // State for tonality info
+  const [tonalityInfo, setTonalityInfo] = useState({
+    isMajor: true,
+    isMinor: false,
+    dominantKey: 'C',
+    intensity: 0.5,
+    lowFrequencyImpact: 0
+  });
+
+  // Frequency bands for the visualization
+  const frequencyBands = useMemo(() => {
+    const bands = [];
+    const minFreq = 20;
+    const maxFreq = 20000;
+    const bandCount = 64;
+    
+    // Create logarithmic frequency bands
+    for (let i = 0; i < bandCount; i++) {
+      const normalizedPos = i / (bandCount - 1);
+      // Logarithmic scaling for better perceptual distribution
+      const freq = minFreq * Math.pow(maxFreq/minFreq, normalizedPos);
+      
+      bands.push({
+        id: `freq-${i}`,
+        frequency: freq,
+        amplitude: 0.01, // Initial tiny amplitude
+        x: (normalizedPos * 2 - 1) * 4, // Position along x-axis from -4 to 4
+        y: 0, // Initial height
+        z: 0,
+        color: frequencyToColor(freq).getHexString()
+      });
+    }
+    
+    // Create initial graph data
+    const initialGraphData = {
+      nodes: bands,
+      links: []
+    };
+    
+    // Connect adjacent frequency bands
+    for (let i = 0; i < bands.length - 1; i++) {
+      initialGraphData.links.push({
+        source: bands[i].id,
+        target: bands[i + 1].id,
+        value: 1
+      });
+    }
+    
+    graphDataRef.current = initialGraphData;
+    return bands;
+  }, []);
+
+  // Create data texture for audio data
   const audioDataTexture = useMemo(() => {
     const size = 256;
     const data = new Float32Array(size * 4);
-    // Fill with initial data
     for (let i = 0; i < size; i++) {
       const stride = i * 4;
       data[stride] = 0;
@@ -125,165 +189,131 @@ export function AnalyticalScene({ effects }: AnalyticalSceneProps) {
   const uniforms = useMemo(() => ({
     time: { value: 0 },
     audioIntensity: { value: 0.5 },
-    baseColor: { value: new THREE.Color(0x3a78ef) },
-    audioTexture: { value: audioDataTexture }
+    audioTexture: { value: audioDataTexture },
+    baseColor: { value: new THREE.Color(0x4466ff) }
   }), [audioDataTexture]);
   
+  // Setup analyzer and visualization elements
   useEffect(() => {
-    // Setup analyzer
-    const analyzer = new Tone.Analyser('fft', 256);
-    analyzerRef.current = analyzer;
-    
-    // Create a shader material
-    const shaderMaterial = new THREE.ShaderMaterial({
-      uniforms,
-      vertexShader: analyticalVertexShader,
-      fragmentShader: analyticalFragmentShader,
-      side: THREE.DoubleSide,
-      wireframe: false,
-    });
-    
-    // Create a plane mesh for frequency visualization
-    const planeGeometry = new THREE.PlaneGeometry(8, 6, 128, 128);
-    const plane = new THREE.Mesh(planeGeometry, shaderMaterial);
-    plane.rotation.x = -Math.PI / 3; // Tilt it for better visibility
-    plane.position.y = -1;
-    
-    shaderMaterialRef.current = shaderMaterial;
-    meshRef.current = plane;
-    
-    // Create grid helper for analytical look
-    const gridHelper = new THREE.GridHelper(20, 20, 0x888888, 0x444444);
-    gridHelper.position.y = -3;
-    gridRef.current = gridHelper;
-    
-    // Create axes helper
-    const axesHelper = new THREE.AxesHelper(5);
-    axesHelper.position.set(-10, -3, -10);
-    axesRef.current = axesHelper;
-    
-    // Create frequency bars for spectrum visualization
-    const barGeometry = new THREE.BoxGeometry(0.15, 1, 0.15);
-    const barMaterial = new THREE.MeshBasicMaterial({ color: 0x4a88ff });
-    
-    const barCount = 64;
-    const freqBars = new THREE.InstancedMesh(barGeometry, barMaterial, barCount);
-    freqBars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    
-    const dummy = new THREE.Object3D();
-    
-    // Position the bars in a semicircle
-    for (let i = 0; i < barCount; i++) {
-      const angle = (Math.PI / barCount) * i - Math.PI / 2;
-      const radius = 8;
-      
-      dummy.position.set(
-        Math.cos(angle) * radius,
-        -2.5,
-        Math.sin(angle) * radius
-      );
-      
-      dummy.scale.set(1, 0.1, 1); // Initial height is small
-      dummy.updateMatrix();
-      
-      freqBars.setMatrixAt(i, dummy.matrix);
+    // Use provided analyzer or create a local one
+    const audioAnalyzer = analyzer || new Tone.Analyser('fft', 1024);
+    if (!analyzer) {
+      localAnalyzerRef.current = audioAnalyzer;
     }
     
-    freqBars.instanceMatrix.needsUpdate = true;
-    freqBarsRef.current = freqBars;
+    // Create shader material
+    const shaderMaterial = new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: spectralVertexShader,
+      fragmentShader: spectralFragmentShader,
+      side: THREE.DoubleSide,
+      transparent: true,
+    });
+    shaderMaterialRef.current = shaderMaterial;
     
+    // Create 3D spectrogram surface
+    const spectrogramGeometry = new THREE.PlaneGeometry(8, 4, 128, 64);
+    spectrogramGeometry.rotateX(-Math.PI / 4); // Tilt for better visibility
+    const spectrogram = new THREE.Mesh(spectrogramGeometry, shaderMaterial);
+    spectrogram.position.z = -2;
+    spectrogram.position.y = -1;
+    spectrogramRef.current = spectrogram;
+    
+    // Create grid helper for analytical look
+    const gridHelper = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
+    gridHelper.position.y = -2;
+    gridRef.current = gridHelper;
+    
+    // Initialize 3D force graph
+    const forceGraph = new ThreeForceGraph()
+      .graphData(graphDataRef.current)
+      .nodeRelSize(0.5)
+      .nodeAutoColorBy('color')
+      .nodeVal((node) => node.amplitude * 50)
+      .linkWidth(0.1)
+      .linkOpacity(0.2)
+      .linkColor(() => new THREE.Color(0x88aaff));
+    
+    forceGraphRef.current = forceGraph;
+    
+    // Clean up
     return () => {
-      if (analyzerRef.current) {
-        analyzerRef.current.dispose();
+      if (localAnalyzerRef.current) {
+        localAnalyzerRef.current.dispose();
       }
       
-      if (shaderMaterialRef.current) {
-        shaderMaterialRef.current.dispose();
+      if (spectrogramGeometry) {
+        spectrogramGeometry.dispose();
       }
       
-      if (planeGeometry) {
-        planeGeometry.dispose();
-      }
-      
-      if (barGeometry) {
-        barGeometry.dispose();
-      }
-      
-      if (barMaterial) {
-        barMaterial.dispose();
+      if (shaderMaterial) {
+        shaderMaterial.dispose();
       }
     };
-  }, [uniforms]);
+  }, [uniforms, analyzer, graphDataRef]);
   
   // Update visualization based on effects
   useEffect(() => {
-    if (!meshRef.current || !shaderMaterialRef.current || !freqBarsRef.current) return;
+    if (!shaderMaterialRef.current) return;
     
     const shaderMaterial = shaderMaterialRef.current;
-    const freqBars = freqBarsRef.current;
     
-    // Change material properties based on active effects
-    const baseColorValue = shaderMaterial.uniforms.baseColor.value;
-    
+    // Apply effect-specific modifications
     if (effects.reverb) {
-      baseColorValue.setHSL(0.6, 0.5, 0.5);
-      shaderMaterial.uniforms.audioIntensity.value = 0.6;
-      shaderMaterial.wireframe = false;
+      shaderMaterial.uniforms.audioIntensity.value = 0.7;
     } else {
-      baseColorValue.setHSL(0.6, 0.4, 0.4);
       shaderMaterial.uniforms.audioIntensity.value = 0.5;
-      shaderMaterial.wireframe = false;
     }
     
-    if (effects.distortion) {
-      shaderMaterial.wireframe = true;
-      (freqBars.material as THREE.MeshBasicMaterial).color.setHSL(0.1, 0.7, 0.5); // More orange for distortion
+    // Update base color based on tonality
+    if (tonalityInfo.isMinor) {
+      // Minor keys get reddish tint
+      shaderMaterial.uniforms.baseColor.value.setHSL(0.05, 0.8, 0.5); // Red
     } else {
-      (freqBars.material as THREE.MeshBasicMaterial).color.setHSL(0.6, 0.7, 0.5); // Blue for clean
+      // Major keys get bluish tint
+      shaderMaterial.uniforms.baseColor.value.setHSL(0.6, 0.8, 0.5); // Blue
     }
     
-    if (effects.filter) {
-      baseColorValue.offsetHSL(0.05, 0, 0); // Slight hue shift
-    }
-  }, [effects]);
+  }, [effects, tonalityInfo]);
   
-  // Use frame for animation and audio data update
+  // Animation and audio data updates
   useFrame(({ clock, scene }) => {
-    if (!meshRef.current || !gridRef.current || !axesRef.current || 
-        !shaderMaterialRef.current || !freqBarsRef.current) return;
+    frameCountRef.current += 1;
     
-    const mesh = meshRef.current;
+    if (!spectrogramRef.current || !gridRef.current || !shaderMaterialRef.current || !forceGraphRef.current) return;
+    
+    const spectrogram = spectrogramRef.current;
     const grid = gridRef.current;
-    const axes = axesRef.current;
-    const freqBars = freqBarsRef.current;
     const shaderMaterial = shaderMaterialRef.current;
+    const forceGraph = forceGraphRef.current;
     
-    // Add elements to scene if not already added
-    if (!scene.children.includes(mesh)) {
-      scene.add(mesh);
+    // Add objects to scene if not already added
+    if (!scene.children.includes(spectrogram)) {
+      scene.add(spectrogram);
     }
     
     if (!scene.children.includes(grid)) {
       scene.add(grid);
     }
     
-    if (!scene.children.includes(axes)) {
-      scene.add(axes);
+    if (!scene.children.includes(forceGraph)) {
+      scene.add(forceGraph);
+      forceGraph.position.set(0, 2, 0); // Position above the spectrogram
     }
     
-    if (!scene.children.includes(freqBars)) {
-      scene.add(freqBars);
-    }
-    
-    // Update shader time uniform
+    // Update time uniform
     shaderMaterial.uniforms.time.value = clock.getElapsedTime();
     
-    // If we have analyzer data, update the audio texture and visualizations
-    if (analyzerRef.current) {
-      const audioData = analyzerRef.current.getValue() as Float32Array;
+    // Get the appropriate analyzer
+    const activeAnalyzer = analyzer || localAnalyzerRef.current;
+    
+    // Update audio data visualizations
+    if (activeAnalyzer) {
+      const audioData = activeAnalyzer.getValue() as Float32Array;
+      
       if (audioData) {
-        // Update the data texture with new audio data
-        const textureData = shaderMaterial.uniforms.audioTexture.value.image.data;
+        // Update the data texture with audio data
+        const textureData = audioDataTexture.image.data;
         const dataSize = Math.min(audioData.length, textureData.length / 4);
         
         for (let i = 0; i < dataSize; i++) {
@@ -295,59 +325,77 @@ export function AnalyticalScene({ effects }: AnalyticalSceneProps) {
           textureData[stride + 3] = 1;     // A
         }
         
-        shaderMaterial.uniforms.audioTexture.value.needsUpdate = true;
+        audioDataTexture.needsUpdate = true;
         
-        // Update frequency bars
-        const barCount = freqBars.count;
-        const dummy = new THREE.Object3D();
-        const barStep = Math.floor(dataSize / barCount);
+        // Update frequency graph nodes with new amplitude data
+        if (frameCountRef.current % 2 === 0) {
+          const graphData = graphDataRef.current;
+          const bandCount = frequencyBands.length;
+          const dataStep = Math.floor(dataSize / bandCount);
+          
+          for (let i = 0; i < bandCount; i++) {
+            const dataIndex = i * dataStep;
+            if (dataIndex < dataSize) {
+              const audioValue = (audioData[dataIndex] as number + 140) / 140; // Normalize to 0-1
+              const node = graphData.nodes[i];
+              
+              // Update node properties
+              node.amplitude = audioValue;
+              node.y = audioValue * 4; // Height based on amplitude
+              
+              // Use tonality info to adjust colors
+              if (tonalityInfo.isMinor) {
+                // For minor keys, shift colors towards red
+                const baseHue = parseInt(node.color, 16);
+                const redShift = new THREE.Color(baseHue).offsetHSL(-0.1, 0, 0);
+                node.color = redShift.getHexString();
+              }
+            }
+          }
+          
+          // Update the force graph
+          forceGraph.graphData(graphData);
+        }
         
-        for (let i = 0; i < barCount; i++) {
-          const dataIndex = i * barStep;
-          const audioValue = (audioData[dataIndex] as number + 140) / 140; // Normalize to 0-1
-          const angle = (Math.PI / barCount) * i - Math.PI / 2;
-          const radius = 8;
+        // Update tonality analysis once every few frames for performance
+        if (frameCountRef.current % 30 === 0) {
+          const tonality = analyzeTonality(audioData);
+          setTonalityInfo(tonality);
           
-          freqBars.getMatrixAt(i, dummy.matrix);
-          
-          // Decompose the matrix to get position, rotation, scale
-          const position = new THREE.Vector3();
-          const quaternion = new THREE.Quaternion();
-          const scale = new THREE.Vector3();
-          dummy.matrix.decompose(position, quaternion, scale);
-          
-          // Update the scale (height) based on the audio data
-          const height = Math.max(0.1, audioValue * 5.0);
-          
-          dummy.position.set(
-            Math.cos(angle) * radius,
-            -2.5 + (height / 2), // Center the bar on its base
-            Math.sin(angle) * radius
+          // Analyze spectral features
+          const spectralFeatures = analyzeSpectralFeatures(
+            audioData, 
+            prevSpectrumRef.current || undefined
           );
           
-          dummy.scale.set(1, height, 1);
-          dummy.updateMatrix();
+          // Update the scene based on spectral features
+          if (spectralFeatures.flux > 0.1) {
+            // Strong spectral flux indicates transients/beats
+            grid.material.color.setHSL(0.6, 0.5, 0.3 + spectralFeatures.flux * 0.3);
+          }
           
-          freqBars.setMatrixAt(i, dummy.matrix);
+          // Store current spectrum for next frame comparison
+          prevSpectrumRef.current = new Float32Array(audioData);
         }
         
-        freqBars.instanceMatrix.needsUpdate = true;
-        
-        // Update shader intensity based on average audio level
-        let sum = 0;
-        for (let i = 0; i < dataSize; i++) {
-          sum += (audioData[i] as number + 140) / 140;
+        // Low frequency impact visualization
+        if (tonalityInfo.lowFrequencyImpact > 0.1) {
+          // Make the grid pulse with low frequency content
+          grid.position.y = -2 + Math.sin(clock.getElapsedTime() * 4) * tonalityInfo.lowFrequencyImpact * 0.1;
+        } else {
+          grid.position.y = -2;
         }
-        const avg = sum / dataSize;
-        
-        // Smooth changes to intensity
-        const currentIntensity = shaderMaterial.uniforms.audioIntensity.value;
-        const targetIntensity = effects.distortion ? avg * 1.2 : avg;
-        shaderMaterial.uniforms.audioIntensity.value = 
-          currentIntensity * 0.9 + targetIntensity * 0.1;
       }
     }
   });
   
-  return null;
+  return (
+    <>
+      <EffectComposer>
+        <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} height={300} />
+        <Vignette eskil={false} offset={0.1} darkness={0.2} />
+      </EffectComposer>
+      <OrbitControls enableDamping dampingFactor={0.05} />
+    </>
+  );
 }

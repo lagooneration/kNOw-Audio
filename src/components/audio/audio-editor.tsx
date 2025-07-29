@@ -6,8 +6,9 @@ import { type AudioData } from '../../types/audio';
 import { EditorSidebar } from './editor-sidebar';
 import { EditorRightSidebar } from './editor-right-sidebar';
 import { EditorToolbar } from './editor-toolbar';
-import { CinematicScene } from '../visualization/cinematic-scene';
-import { AnalyticalScene } from '../visualization/analytical-scene';
+// Direct import with explicit path
+import { AnalyticalScene } from '../visualization/analytical-scene.tsx';
+import { CinematicScene } from '../visualization/cinematic-scene.tsx';
 
 interface AudioEditorProps {
   audioData: AudioData;
@@ -26,6 +27,9 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
   const [visualizationType, setVisualizationType] = useState<'mathematical' | 'cinematic'>('mathematical');
   const [isOscillatorEnabled, setIsOscillatorEnabled] = useState(false);
   const [activeSidebarTab, setActiveSidebarTab] = useState('effects');
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
   
   const playerRef = useRef<Tone.Player | null>(null);
   const reverbRef = useRef<Tone.Reverb | null>(null);
@@ -54,8 +58,13 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     const player = new Tone.Player({
       url: audioData.url,
       loop: true,
+      playbackRate: playbackSpeed,
       onload: () => {
         console.log('Audio loaded');
+        // Set total duration once loaded
+        if (player.buffer) {
+          setTotalDuration(player.buffer.duration);
+        }
       }
     }).toDestination();
     
@@ -88,7 +97,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
         cancelAnimationFrame(id);
       }
     };
-  }, [audioData, filterFreq]);
+  }, [audioData, filterFreq, playbackSpeed]);
   
   // Update effect chain when effects change
   useEffect(() => {
@@ -160,6 +169,14 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     }));
   };
   
+  // Handle playback speed change
+  const handlePlaybackSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+    if (playerRef.current) {
+      playerRef.current.playbackRate = speed;
+    }
+  };
+  
   // Setup visualization
   useEffect(() => {
     if (!canvasRef.current || !analyzerRef.current) return;
@@ -169,6 +186,18 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     if (!ctx) return;
     
     const analyzer = analyzerRef.current;
+    
+    // Track playback time
+    const updateTime = () => {
+      if (playerRef.current && isPlaying) {
+        setCurrentTime(playerRef.current.now());
+        requestAnimationFrame(updateTime);
+      }
+    };
+    
+    if (isPlaying) {
+      updateTime();
+    }
     
     // Resize canvas
     const resizeCanvas = () => {
@@ -241,7 +270,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [visualizationMode]);
+  }, [visualizationMode, isPlaying]);
   
   return (
     <div className="visualization-container flex flex-col h-[calc(100vh-14rem)]">
@@ -266,6 +295,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
               <AudioEditor3D 
                 effects={effects} 
                 visualizationType={visualizationType}
+                analyzer={analyzerRef.current}
               />
             </div>
           </div>
@@ -284,6 +314,10 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
       <EditorToolbar 
         visualizationMode={visualizationMode}
         onVisualizationModeChange={setVisualizationMode}
+        playbackSpeed={playbackSpeed}
+        onPlaybackSpeedChange={handlePlaybackSpeedChange}
+        currentTime={currentTime}
+        totalDuration={totalDuration}
       />
     </div>
   );
@@ -297,20 +331,20 @@ interface AudioEditor3DProps {
     filter: boolean;
   };
   visualizationType: 'mathematical' | 'cinematic';
+  analyzer: Tone.Analyser | null;
 }
 
-function AudioEditor3D({ effects, visualizationType }: AudioEditor3DProps) {
+function AudioEditor3D({ effects, visualizationType, analyzer }: AudioEditor3DProps) {
   return (
     <div className="three-container h-full">
       <Canvas camera={{ position: [0, 0, 15], fov: 60 }}>
         <ambientLight intensity={0.5} />
         <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
         <pointLight position={[-10, -10, -10]} intensity={1} />
-        {visualizationType === 'cinematic' ? (
-          <CinematicScene effects={effects} />
-        ) : (
-          <AnalyticalScene effects={effects} />
-        )}
+        {visualizationType === 'cinematic' 
+          ? <CinematicScene effects={effects} analyzer={analyzer} />
+          : <AnalyticalScene effects={effects} analyzer={analyzer} />
+        }
         <OrbitControls enableZoom={true} enablePan={true} />
       </Canvas>
     </div>

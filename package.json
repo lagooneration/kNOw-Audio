@@ -18,6 +18,7 @@
     "@radix-ui/react-tabs": "^1.1.12",
     "@react-three/drei": "^10.6.1",
     "@react-three/fiber": "^9.3.0",
+    "@react-three/postprocessing": "^3.0.4",
     "@types/d3": "^7.4.3",
     "@types/three": "^0.178.1",
     "class-variance-authority": "^0.7.1",
@@ -25,6 +26,7 @@
     "d3": "^7.9.0",
     "fft-js": "^0.0.12",
     "lucide-react": "^0.532.0",
+    "plotly.js-gl3d-dist": "^3.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.1",
@@ -32,6 +34,7 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^3.4.1",
     "three": "^0.178.0",
+    "three-forcegraph": "^1.43.0",
     "tone": "^15.1.22",
     "wavesurfer.js": "^7.10.1",
     "web-audio-beat-detector": "^8.2.30"

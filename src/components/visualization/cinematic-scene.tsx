@@ -1,8 +1,8 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { useTexture } from '@react-three/drei';
 import * as Tone from 'tone';
+import { analyzeTonality } from '../../utils/audio-analysis';
 
 // Fragment shader for cinematic audio visualization
 const cinematicFragmentShader = `
@@ -88,16 +88,20 @@ interface CinematicSceneProps {
     distortion: boolean;
     filter: boolean;
   };
+  analyzer: Tone.Analyser | null;
 }
 
-export function CinematicScene({ effects }: CinematicSceneProps) {
+export function CinematicScene({ effects, analyzer }: CinematicSceneProps) {
   const shaderMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
   const sphereRef = useRef<THREE.Mesh | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
-  const analyzerRef = useRef<Tone.Analyser | null>(null);
-  
-  // Environment texture for reflections
-  const envMap = useTexture('/textures/envmap.jpg');
+  const localAnalyzerRef = useRef<Tone.Analyser | null>(null);
+  const [tonalityInfo, setTonalityInfo] = useState({ 
+    isMajor: true, 
+    isMinor: false, 
+    lowFrequencyImpact: 0 
+  });
+  const frameCountRef = useRef(0);
   
   // Create a data texture for audio data
   const audioDataTexture = useMemo(() => {
@@ -132,10 +136,13 @@ export function CinematicScene({ effects }: CinematicSceneProps) {
     pulseRate: { value: 2.0 }
   }), [audioDataTexture]);
   
+  // Setup analyzer and visualization elements
   useEffect(() => {
-    // Setup analyzer
-    const analyzer = new Tone.Analyser('fft', 256);
-    analyzerRef.current = analyzer;
+    // Use provided analyzer or create a local one if needed
+    const audioAnalyzer = analyzer || new Tone.Analyser('fft', 256);
+    if (!analyzer) {
+      localAnalyzerRef.current = audioAnalyzer;
+    }
     
     // Create a shader material
     const shaderMaterial = new THREE.ShaderMaterial({
@@ -189,9 +196,10 @@ export function CinematicScene({ effects }: CinematicSceneProps) {
     const particles = new THREE.Points(particleGeometry, particleMaterial);
     particlesRef.current = particles;
     
+    // Clean up
     return () => {
-      if (analyzerRef.current) {
-        analyzerRef.current.dispose();
+      if (localAnalyzerRef.current) {
+        localAnalyzerRef.current.dispose();
       }
       
       if (shaderMaterialRef.current) {
@@ -206,7 +214,7 @@ export function CinematicScene({ effects }: CinematicSceneProps) {
         particleMaterial.dispose();
       }
     };
-  }, [uniforms]);
+  }, [uniforms, analyzer]);
   
   // Update visualization based on effects
   useEffect(() => {
@@ -248,10 +256,24 @@ export function CinematicScene({ effects }: CinematicSceneProps) {
     if (effects.filter) {
       baseColorValue.offsetHSL(0.1, 0, 0); // Shift hue slightly
     }
-  }, [effects]);
+    
+    // Adjust colors based on tonality
+    if (tonalityInfo.isMinor) {
+      // For minor keys, shift colors towards red
+      baseColorValue.offsetHSL(-0.5, 0.1, 0); // Move to red spectrum
+      accentColorValue.offsetHSL(-0.4, 0.2, 0);
+    } else {
+      // For major keys, stay in blue spectrum or shift towards cooler blues
+      baseColorValue.offsetHSL(0.1, 0, 0);
+      accentColorValue.offsetHSL(0.05, 0, 0);
+    }
+    
+  }, [effects, tonalityInfo]);
   
   // Use frame for animation and audio data update
   useFrame(({ clock, scene }) => {
+    frameCountRef.current += 1;
+    
     if (!sphereRef.current || !particlesRef.current || !shaderMaterialRef.current) return;
     
     const sphere = sphereRef.current;
@@ -277,9 +299,12 @@ export function CinematicScene({ effects }: CinematicSceneProps) {
     // Animate the particles - slow rotation
     particles.rotation.y = clock.getElapsedTime() * 0.03;
     
+    // Get the appropriate analyzer
+    const activeAnalyzer = analyzer || localAnalyzerRef.current;
+    
     // If we have analyzer data, update the audio texture
-    if (analyzerRef.current) {
-      const audioData = analyzerRef.current.getValue() as Float32Array;
+    if (activeAnalyzer) {
+      const audioData = activeAnalyzer.getValue() as Float32Array;
       if (audioData) {
         // Update the data texture with new audio data
         const textureData = shaderMaterial.uniforms.audioTexture.value.image.data;
@@ -308,6 +333,27 @@ export function CinematicScene({ effects }: CinematicSceneProps) {
         const targetIntensity = effects.distortion ? avg * 1.5 : avg;
         shaderMaterial.uniforms.audioIntensity.value = 
           currentIntensity * 0.9 + targetIntensity * 0.1;
+          
+        // Update tonality analysis once every few frames for performance
+        if (frameCountRef.current % 30 === 0) {
+          const tonality = analyzeTonality(audioData);
+          setTonalityInfo({
+            isMajor: tonality.isMajor,
+            isMinor: tonality.isMinor,
+            lowFrequencyImpact: tonality.lowFrequencyImpact
+          });
+          
+          // Low frequency impact visualization (kick drums, etc)
+          if (tonality.lowFrequencyImpact > 0.2) {
+            // Pulse the background particles on low frequency impacts
+            const particleMaterial = particles.material as THREE.PointsMaterial;
+            particleMaterial.size = 0.1 + tonality.lowFrequencyImpact * 0.2;
+            
+            // Create a flashing effect
+            const flashIntensity = tonality.lowFrequencyImpact;
+            particleMaterial.opacity = 0.7 + flashIntensity * 0.3;
+          }
+        }
       }
     }
   });
