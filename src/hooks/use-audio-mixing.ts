@@ -65,9 +65,16 @@ export function useAudioMixing() {
     };
   }, [mixingState.track1, mixingState.track2]);
 
+  // Helper function to get overlapping duration
+  const getOverlappingDuration = useCallback(() => {
+    if (!mixingState.track1 || !mixingState.track2) return 0;
+    return Math.min(mixingState.track1.buffer.duration, mixingState.track2.buffer.duration);
+  }, [mixingState.track1, mixingState.track2]);
+
   return {
     mixingState,
     processTrack,
-    clearTrack
+    clearTrack,
+    getOverlappingDuration
   };
 }

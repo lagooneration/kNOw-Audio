@@ -43,6 +43,23 @@ export function MixingPage() {
       setSuggestions([]);
     }
   }, [mixingState.track1, mixingState.track2]);
+  
+  // Calculate overlapping duration when both tracks are loaded
+  const getOverlappingInfo = () => {
+    if (!mixingState.track1 || !mixingState.track2) return null;
+    
+    const duration1 = mixingState.track1.metadata.duration;
+    const duration2 = mixingState.track2.metadata.duration;
+    const overlapDuration = Math.min(duration1, duration2);
+    
+    const hasDifferentLengths = Math.abs(duration1 - duration2) > 0.5; // More than 0.5 seconds difference
+    
+    return {
+      overlapDuration,
+      hasDifferentLengths,
+      track1IsShorter: duration1 < duration2
+    };
+  };
 
   const handleTrack1Selected = async (file: File) => {
     try {
@@ -68,7 +85,7 @@ export function MixingPage() {
       
       <Container className="relative z-10">
         <div className="max-w-6xl mx-auto space-y-8 py-8">
-          <div>
+          <div className='text-center mb-8'>
             <h1 className="text-3xl font-bold mb-4">Audio Mixer</h1>
             <p className="text-muted-foreground mb-8">
               Upload two audio tracks to analyze frequency overlaps and get EQ suggestions for better mixing.
@@ -197,10 +214,27 @@ export function MixingPage() {
                       <p className="text-sm text-muted-foreground mb-4">
                         This visualization shows the frequency spectrum of both tracks and highlights areas where they overlap.
                         <span className="block mt-1">
-                          <span className="inline-block w-3 h-3 bg-orange-500/60 mr-1"></span> Constructive overlaps enhance each other.
-                          <span className="inline-block w-3 h-3 bg-red-500/60 mx-1 ml-3"></span> Destructive overlaps compete for the same frequency space.
+                          <span className="inline-block w-3 h-3 bg-orange-500/60 mr-1"></span> Constructive overlaps enhance and complement each other.
+                          <span className="inline-block w-3 h-3 bg-red-500/60 mx-1 ml-3"></span> Destructive overlaps compete and create muddiness or masking.
                         </span>
                       </p>
+                      
+                      {/* Show track length difference warning if applicable */}
+                      {(() => {
+                        const overlapInfo = getOverlappingInfo();
+                        if (overlapInfo && overlapInfo.hasDifferentLengths) {
+                          return (
+                            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md">
+                              <p className="text-sm text-amber-200">
+                                <span className="font-medium">Note:</span> These tracks have different lengths 
+                                ({Math.abs(mixingState.track1!.metadata.duration - mixingState.track2!.metadata.duration).toFixed(1)}s difference).
+                                Analysis is performed on the first {overlapInfo.overlapDuration.toFixed(1)} seconds of both tracks.
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       
                       <div className="space-y-6">
                         <FrequencyOverlapVisualizer

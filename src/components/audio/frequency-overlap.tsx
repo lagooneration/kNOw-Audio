@@ -99,36 +99,66 @@ export function FrequencyOverlapVisualizer({
       const binIndex = Math.floor(overlap.frequency * bufferLength / nyquist);
       const x = binIndex * barWidth;
       
-      // Determine color based on constructive/destructive
-      const color = overlap.isConstructive 
-        ? `rgba(255, 165, 0, ${overlap.overlapIntensity * 0.8})` // Orange for constructive
-        : `rgba(255, 0, 0, ${overlap.overlapIntensity * 0.8})`; // Red for destructive
+      // Determine color and opacity based on constructive/destructive nature and intensity
+      // Use higher opacity for stronger overlaps
+      const baseOpacity = 0.3 + (overlap.overlapIntensity * 0.7);
       
-      // Draw vertical highlight for the overlap
+      const color = overlap.isConstructive 
+        ? `rgba(255, 165, 0, ${baseOpacity})` // Orange for constructive
+        : `rgba(255, 0, 0, ${baseOpacity})`; // Red for destructive
+      
+      // Draw vertical highlight for the overlap - use wider bars for important frequencies
+      const highlightWidth = Math.max(2, Math.min(6, overlap.overlapIntensity * 8)) * barWidth;
+      
       ctx.fillStyle = color;
       ctx.fillRect(
-        x - barWidth * 2, 
+        x - highlightWidth / 2, 
         0, 
-        barWidth * 4, 
+        highlightWidth, 
+        height
+      );
+      
+      // Add a border to make it more visible
+      ctx.strokeStyle = overlap.isConstructive ? 'rgba(255, 200, 100, 0.9)' : 'rgba(255, 100, 100, 0.9)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        x - highlightWidth / 2, 
+        0, 
+        highlightWidth, 
         height
       );
       
       // Add label for significant overlaps
       if (overlap.overlapIntensity > 0.6) {
+        // Draw a background for the text to make it more readable
+        const frequencyText = `${Math.round(overlap.frequency)}Hz`;
+        const typeText = overlap.isConstructive ? 'Constructive' : 'Destructive';
+        
+        // Measure text width
+        const freqTextWidth = ctx.measureText(frequencyText).width;
+        const typeTextWidth = ctx.measureText(typeText).width;
+        const maxWidth = Math.max(freqTextWidth, typeTextWidth);
+        
+        // Draw background for frequency text
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(x - maxWidth/2 - 5, height - 45, maxWidth + 10, 40);
+        
+        // Draw text
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(
-          `${Math.round(overlap.frequency)}Hz`, 
+          frequencyText, 
           x, 
-          height - 5
+          height - 30
         );
         
         // Add constructive/destructive label
+        ctx.fillStyle = overlap.isConstructive ? 'rgba(255, 200, 100, 1)' : 'rgba(255, 100, 100, 1)';
         ctx.fillText(
-          overlap.isConstructive ? 'Constructive' : 'Destructive',
+          typeText,
           x,
-          height - 20
+          height - 15
         );
       }
     });

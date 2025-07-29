@@ -20,8 +20,15 @@ export function EQSuggestionsDisplay({
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            No EQ adjustments needed. These tracks already work well together!
+            Based on our analysis, these tracks don't have significant destructive frequency overlaps. 
+            Here are some general mixing tips:
           </p>
+          <ul className="list-disc pl-5 mt-4 space-y-2 text-sm text-muted-foreground">
+            <li>Try panning the tracks slightly to create separation in the stereo field</li>
+            <li>Consider using sidechain compression if one track needs to give way to another</li>
+            <li>Listen for any overall tonal balance issues that might need subtle EQ adjustments</li>
+            <li>Try automating EQ or volume to create more dynamic interest</li>
+          </ul>
         </CardContent>
       </Card>
     );

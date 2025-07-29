@@ -13,6 +13,7 @@ import { AudioVisualizer } from '../components/visualization/audio-visualizer-3d
 import { useAudioProcessing } from '../hooks/use-audio-processing';
 import DarkVeil from '../components/ui/DarkVeil';
 import MagicBento from '../components/ui/MagicBento';
+import Search from '../components/ui/Search';
 
 export function HomePage() {
   const { audioData, isProcessing, processAudio } = useAudioProcessing();
@@ -44,9 +45,8 @@ export function HomePage() {
         <div className="max-w-5xl mx-auto space-y-8 py-8">
           <div className='text-center mb-8'>
             <h1 className="text-3xl font-regular mb-4">kNOw Audio</h1>
-            <p className="text-muted-foreground mb-8">
-              Upload an audio file to analyze its properties and visualize its content.
-            </p>
+           
+            <Search />
           </div>
 
           <div className="mb-8 min-h-[400px] flex items-center">
