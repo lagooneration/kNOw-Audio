@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FileUpload } from './file-upload';
+import { Button } from '../ui/button';
 import type { AudioData } from '../../types/audio';
 import type { SpatialAudioData } from '../../types/spatial-audio';
 
@@ -7,12 +8,14 @@ interface SpatialAudioSidebarProps {
   audioFiles: SpatialAudioData[];
   onAudioFileAdded: (audioData: SpatialAudioData) => void;
   onDragStart: (audioData: SpatialAudioData) => void;
+  onTogglePlay?: (id: string) => void;
 }
 
 export function SpatialAudioSidebar({
   audioFiles,
   onAudioFileAdded,
-  onDragStart
+  onDragStart,
+  onTogglePlay
 }: SpatialAudioSidebarProps) {
   // Handle file upload
   const handleFileUpload = async (file: File) => {
@@ -29,6 +32,9 @@ export function SpatialAudioSidebar({
       url,
       file,
       color,
+      position: { x: 0, y: 0, z: 0 }, // Default position
+      isPlaying: false,
+      volume: 1.0,
       // These will be populated later
       buffer: new AudioBuffer({ length: 1, numberOfChannels: 1, sampleRate: 44100 }),
       metadata: {
@@ -107,17 +113,54 @@ export function SpatialAudioSidebar({
               {audioFiles.map((audio) => (
                 <div 
                   key={audio.id}
-                  className="bg-background/50 rounded-md p-2 flex items-center gap-2 cursor-move"
+                  className="bg-background/50 rounded-md p-2 flex items-center gap-2"
                   draggable
                   onDragStart={(e) => handleDragStart(e, audio)}
                 >
                   <div 
-                    className="w-3 h-3 rounded-full"
+                    className={`w-3 h-3 rounded-full ${audio.isPlaying ? 'animate-pulse' : ''}`}
                     style={{ backgroundColor: audio.color }}
                   />
                   <span className="text-xs truncate flex-1" title={audio.name}>
                     {audio.name}
                   </span>
+                  
+                  <div className="flex gap-1">
+                    {/* Play/Pause Button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if (onTogglePlay) {
+                          onTogglePlay(audio.id);
+                        }
+                      }}
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        {audio.isPlaying ? (
+                          <>
+                            <rect x="6" y="4" width="4" height="16"></rect>
+                            <rect x="14" y="4" width="4" height="16"></rect>
+                          </>
+                        ) : (
+                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        )}
+                      </svg>
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

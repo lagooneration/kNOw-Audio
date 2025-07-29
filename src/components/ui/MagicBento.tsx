@@ -36,9 +36,16 @@ const cardData: BentoCardProps[] = [
   {
     color: "#060010",
     title: "",
-    description: "Audio Visualization",
+    description: "Visualize features",
     label: "Analysis",
     image: "/images/editing.svg"
+  },
+  {
+    color: "#060010",
+    title: "",
+    description: "Smart EQ assist",
+    label: "Mixing",
+    image: "/images/mixing.svg"
   },
   {
     color: "#060010",
@@ -50,27 +57,22 @@ const cardData: BentoCardProps[] = [
   },
   {
     color: "#060010",
-    title: "Audio Mixing",
-    description: "Mix tracks with intelligent EQ suggestions",
-    label: "Mixing",
-    image: "/images/mixing.svg"
-  },
-  {
-    color: "#060010",
-    title: "Chord Generator",
+    title: "",
     description: "Generate chords for your music compositions",
-    label: "Chords",
+    label: "Chord Generator",
+    image: "/images/chord-gen.jpg",
+    backgroundImage: true
   },
   {
     color: "#060010",
-    title: "AI Smart Analysis",
-    description: "",
+    title: "",
+    description: "coming soon",
     label: "AI Analysis",
   },
   {
     color: "#060010",
-    title: "Beat Production",
-    description: "",
+    title: "",
+    description: "coming soon",
     label: "Beats",
   },
 ];
@@ -762,13 +764,13 @@ const MagicBento: React.FC<BentoProps> = ({
                       />
                     </div>
                   )}
-                  <div className="card__header flex justify-between gap-3 relative text-white z-10">
+                  <div className="card__header flex flex-col justify-between gap-3 relative text-white z-10">
                     <span className="card__label text-base">{card.label}</span>
                     {card.image && !card.backgroundImage && (
                       <img 
                         src={card.image} 
                         alt={card.title} 
-                        className="w-10 h-10 object-contain"
+                        className="w-18 h-16 mt-4 object-contain"
                       />
                     )}
                   </div>
@@ -779,7 +781,7 @@ const MagicBento: React.FC<BentoProps> = ({
                       {card.title}
                     </h3>
                     <p
-                      className={`card__description text-xs leading-5 opacity-90 ${textAutoHide ? "text-clamp-2" : ""}`}
+                      className={`card__description text-sm leading-5 opacity-80 ${textAutoHide ? "text-clamp-2" : ""}`}
                     >
                       {card.description}
                     </p>

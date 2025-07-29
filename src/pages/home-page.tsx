@@ -10,6 +10,7 @@ import { Spectrogram } from '../components/audio/spectrogram';
 import { AudioMetadataDisplay } from '../components/audio/metadata-display';
 import { AnalysisResults } from '../components/audio/analysis-results';
 import { AudioVisualizer } from '../components/visualization/audio-visualizer-3d';
+import { SpectralAnalysis } from '../components/audio/spectral-analysis';
 import { useAudioProcessing } from '../hooks/use-audio-processing';
 import DarkVeil from '../components/ui/DarkVeil';
 import MagicBento from '../components/ui/MagicBento';
@@ -35,7 +36,7 @@ export function HomePage() {
   };
 
   return (
-    <div className="relative min-h-screen">
+    <div className="dark relative min-h-screen">
       {/* DarkVeil as background */}
       <div className="fixed inset-0 z-0">
         <DarkVeil />
@@ -44,7 +45,7 @@ export function HomePage() {
       <Container className="relative z-10">
         <div className="max-w-5xl mx-auto space-y-8 py-8">
           <div className='text-center mb-8'>
-            <h1 className="text-3xl font-regular mb-4">kNOw Audio</h1>
+            <h1 className="text-3xl font-bold text-white/90 mb-4">Know Audio</h1>
            
             <Search />
           </div>
@@ -105,25 +106,25 @@ export function HomePage() {
                 <CardTitle>Audio Visualization</CardTitle>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <button 
-                    className={`px-3 py-1 rounded-md ${activeVisualization === 'waveform' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
+                    className={`px-3 py-1 rounded-md ${activeVisualization === 'waveform' ? 'bg-primary text-primary-foreground' : 'bg-secondary/70 dark:bg-slate-700/50 text-secondary-foreground border border-slate-600/30'}`}
                     onClick={() => setActiveVisualization('waveform')}
                   >
                     Waveform
                   </button>
                   <button 
-                    className={`px-3 py-1 rounded-md ${activeVisualization === 'frequency' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
+                    className={`px-3 py-1 rounded-md ${activeVisualization === 'frequency' ? 'bg-primary text-primary-foreground' : 'bg-secondary/70 dark:bg-slate-700/50 text-secondary-foreground border border-slate-600/30'}`}
                     onClick={() => setActiveVisualization('frequency')}
                   >
                     Frequency
                   </button>
                   <button 
-                    className={`px-3 py-1 rounded-md ${activeVisualization === 'spectrogram' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
+                    className={`px-3 py-1 rounded-md ${activeVisualization === 'spectrogram' ? 'bg-primary text-primary-foreground' : 'bg-secondary/70 dark:bg-slate-700/50 text-secondary-foreground border border-slate-600/30'}`}
                     onClick={() => setActiveVisualization('spectrogram')}
                   >
                     Spectrogram
                   </button>
                   <button 
-                    className={`px-3 py-1 rounded-md ${activeVisualization === '3d' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
+                    className={`px-3 py-1 rounded-md ${activeVisualization === '3d' ? 'bg-primary text-primary-foreground' : 'bg-secondary/70 dark:bg-slate-700/50 text-secondary-foreground border border-slate-600/30'}`}
                     onClick={() => setActiveVisualization('3d')}
                   >
                     3D View
@@ -166,6 +167,8 @@ export function HomePage() {
             </Card>
             
             <AnalysisResults audioData={audioData} />
+            
+            <SpectralAnalysis audioData={audioData} />
             
             <div className="flex justify-center">
               <Button 

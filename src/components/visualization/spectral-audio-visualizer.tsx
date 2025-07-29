@@ -19,7 +19,7 @@ interface SpectralAudioVisualizerProps {
 export function SpectralAudioVisualizer({ analyzer, isPlaying, effects }: SpectralAudioVisualizerProps) {
   // Component to create the visualization
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full bg-black/40 backdrop-blur-sm rounded-md overflow-hidden">
       <Canvas camera={{ position: [0, 3, 5], fov: 60 }}>
         <SpectralVisualization analyzer={analyzer} isPlaying={isPlaying} effects={effects} />
         <OrbitControls enableZoom={true} enablePan={true} />

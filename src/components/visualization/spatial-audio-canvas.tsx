@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
-import type { SpatialAudioData, AudioBlobVisualization } from '../../types/spatial-audio';
+import type { SpatialAudioData, AudioBlobVisualization, AudioPlacement } from '../../types/spatial-audio';
+import { SpatialAudioScene } from './spatial-audio-scene';
 
 // Shader for analytical visualization overlay
 const vertexShader = `
@@ -253,29 +254,43 @@ export function SpatialAudioCanvas({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <Canvas ref={canvasRef}>
-        {/* Controls */}
-        <OrbitControls enableDamping dampingFactor={0.1} />
-        
-        {/* Environment */}
-        <Environment />
-        
-        {/* Audio Blobs */}
-        {blobs.map(blob => (
-          <AudioBlob 
-            key={blob.audioId}
-            blob={blob}
-            isSelected={selectedBlob === blob.audioId}
-            onClick={() => setSelectedBlob(blob.audioId)}
+      {visualizationType === 'analytical' ? (
+        <Canvas ref={canvasRef}>
+          {/* Controls */}
+          <OrbitControls enableDamping dampingFactor={0.1} />
+          
+          {/* Environment */}
+          <Environment />
+          
+          {/* Audio Blobs */}
+          {blobs.map(blob => (
+            <AudioBlob 
+              key={blob.audioId}
+              blob={blob}
+              isSelected={selectedBlob === blob.audioId}
+              onClick={() => setSelectedBlob(blob.audioId)}
+            />
+          ))}
+          
+          {/* Spectral Overlay */}
+          <SpectralOverlay 
+            isVisible={true}
+            audioData={audioAnalysisData}
           />
-        ))}
-        
-        {/* Spectral Overlay */}
-        <SpectralOverlay 
-          isVisible={visualizationType === 'analytical'}
-          audioData={audioAnalysisData}
+        </Canvas>
+      ) : (
+        <SpatialAudioScene
+          audioSources={audioSources}
+          audioAnalysisData={audioAnalysisData}
+          onAudioPlaced={(placement) => {
+            onAudioPositionChanged(placement.id, placement.position);
+          }}
+          onAudioSelected={(id) => setSelectedBlob(id)}
+          onAudioDropped={(id, position) => {
+            onAudioPositionChanged(id, position);
+          }}
         />
-      </Canvas>
+      )}
     </div>
   );
 }

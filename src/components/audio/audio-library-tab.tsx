@@ -9,6 +9,7 @@ interface AudioLibraryTabProps {
   onAddAudio: (file: File) => Promise<void>;
   onRemoveAudio: (id: string) => void;
   onSelectAudio: (id: string) => void;
+  onTogglePlay?: (id: string) => void;
   maxFiles: number;
 }
 
@@ -18,6 +19,7 @@ export function AudioLibraryTab({
   onAddAudio,
   onRemoveAudio,
   onSelectAudio,
+  onTogglePlay,
   maxFiles
 }: AudioLibraryTabProps) {
   const [isUploading, setIsUploading] = useState(false);
@@ -80,7 +82,7 @@ export function AudioLibraryTab({
             >
               <div className="flex items-center">
                 <div 
-                  className="w-3 h-3 rounded-full mr-2" 
+                  className={`w-3 h-3 rounded-full mr-2 ${item.isPlaying ? 'animate-pulse' : ''}`}
                   style={{ backgroundColor: item.color }}
                 />
                 <span className="truncate max-w-[120px]">{item.name}</span>
@@ -88,31 +90,67 @@ export function AudioLibraryTab({
               
               {item.isLoading && <span className="text-xs">Loading...</span>}
               
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemoveAudio(item.id);
-                }}
-              >
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              <div className="flex items-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 mr-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Toggle play/pause for this audio item
+                    if (onTogglePlay) {
+                      onTogglePlay(item.id);
+                    }
+                  }}
                 >
-                  <path d="M3 6h18"></path>
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                </svg>
-              </Button>
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {item.isPlaying ? (
+                      <>
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                      </>
+                    ) : (
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    )}
+                  </svg>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveAudio(item.id);
+                  }}
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                  </svg>
+                </Button>
+              </div>
             </div>
           ))
         )}
@@ -123,7 +161,9 @@ export function AudioLibraryTab({
         <h4 className="text-xs font-medium mb-1">How to use:</h4>
         <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
           <li>Upload audio files using the form above</li>
+          <li>Press the play button to hear the audio</li>
           <li>Drop it onto the 3D canvas to create a sound source</li>
+          <li>Audio blobs will animate based on sound frequencies</li>
           <li>Click on a blob to select and edit it</li>
         </ol>
       </div>

@@ -74,6 +74,24 @@ export function SpatialAudioPage() {
     }
   };
   
+  // Handle toggle play for a specific audio source
+  const handleToggleAudio = (id: string) => {
+    setAudioSources(prev => 
+      prev.map(source => 
+        source.id === id 
+          ? toggleSpatialAudioPlayback(source, !source.isPlaying)
+          : source
+      )
+    );
+    
+    // Check if any audio is now playing
+    const anyPlaying = audioSources.some(source => 
+      source.id === id ? !source.isPlaying : source.isPlaying
+    );
+    
+    setIsPlaying(anyPlaying);
+  };
+  
   // Handle audio position changed
   const handleAudioPositionChanged = (id: string, position: { x: number; y: number; z: number }) => {
     setAudioSources(prev => 
@@ -102,8 +120,12 @@ export function SpatialAudioPage() {
   };
   
   // Convert visualization type between our internal state and the EditorToolbar component's expected values
-  const handleVisualizationTypeChange = (type: 'mathematical' | 'cinematic') => {
-    setVisualizationType(type === 'mathematical' ? 'analytical' : 'cinematic');
+  const handleVisualizationTypeChange = (type: 'mathematical' | 'cinematic' | 'spatial') => {
+    if (type === 'mathematical') {
+      setVisualizationType('analytical');
+    } else if (type === 'cinematic' || type === 'spatial') {
+      setVisualizationType('cinematic');
+    }
   };
   
   return (
@@ -115,6 +137,7 @@ export function SpatialAudioPage() {
             audioFiles={audioSources} 
             onAudioFileAdded={handleAudioFileAdded}
             onDragStart={() => {}}
+            onTogglePlay={handleToggleAudio}
           />
           
           {/* Main Canvas */}

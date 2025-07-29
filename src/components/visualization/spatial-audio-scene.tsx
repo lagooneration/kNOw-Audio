@@ -1,8 +1,9 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { type SpatialAudioData, type AudioPlacement } from '../../types/spatial-audio';
+import { createAudioBlobMaterial, updateAudioBlobShader } from './audio-blob-shader';
 
 interface AudioBlobProps {
   position: [number, number, number];
@@ -10,6 +11,7 @@ interface AudioBlobProps {
   name: string;
   isPlaying: boolean;
   isSelected: boolean;
+  audioData?: Float32Array;
   onClick: () => void;
   onDragStart: () => void;
   onDrag: (position: { x: number; y: number; z: number }) => void;
@@ -22,26 +24,48 @@ function AudioBlob({
   name,
   isPlaying,
   isSelected,
+  audioData,
   onClick,
   onDragStart,
   onDrag,
   onDragEnd
 }: AudioBlobProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const { camera, raycaster, mouse, gl } = useThree();
+  const { camera, raycaster, mouse, gl, clock } = useThree();
   const plane = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const intersection = useRef<THREE.Vector3>(new THREE.Vector3());
   
-  // Animation for pulsing when audio is playing
+  // Create shader material on mount
+  useEffect(() => {
+    if (meshRef.current) {
+      const material = createAudioBlobMaterial(color, isPlaying);
+      meshRef.current.material = material;
+      materialRef.current = material;
+    }
+  }, [color, isPlaying]);
+  
+  // Animation for blob when audio is playing
   useFrame((state) => {
     if (!meshRef.current) return;
     
-    if (isPlaying) {
+    // Update shader uniforms
+    if (materialRef.current) {
+      updateAudioBlobShader(
+        materialRef.current,
+        audioData || new Float32Array(512),
+        isPlaying,
+        state.clock.elapsedTime
+      );
+    }
+    
+    // Simple scale animation as fallback if shader doesn't work
+    if (isPlaying && !materialRef.current) {
       meshRef.current.scale.x = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.1;
       meshRef.current.scale.y = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.1;
       meshRef.current.scale.z = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.1;
-    } else {
+    } else if (!isPlaying && !materialRef.current) {
       meshRef.current.scale.set(1, 1, 1);
     }
     
@@ -106,6 +130,7 @@ function AudioBlob({
         onPointerOut={handlePointerOut}
       >
         <sphereGeometry args={[0.5, 32, 32]} />
+        {/* This material will be replaced by the shader in useEffect */}
         <meshStandardMaterial 
           color={color} 
           transparent 
@@ -150,6 +175,7 @@ function GridFloor() {
 
 interface SpatialAudioSceneProps {
   audioSources: SpatialAudioData[];
+  audioAnalysisData?: Float32Array;
   onAudioPlaced: (placement: AudioPlacement) => void;
   onAudioSelected: (id: string) => void;
   onAudioDropped?: (id: string, position: { x: number; y: number; z: number }) => void;
@@ -157,6 +183,7 @@ interface SpatialAudioSceneProps {
 
 export function SpatialAudioScene({
   audioSources,
+  audioAnalysisData,
   onAudioPlaced,
   onAudioSelected,
   onAudioDropped
@@ -251,6 +278,7 @@ export function SpatialAudioScene({
             name={source.name}
             isPlaying={source.isPlaying}
             isSelected={!!source.isSelected}
+            audioData={audioAnalysisData}
             onClick={() => onAudioSelected(source.id)}
             onDragStart={() => {
               onAudioPlaced({

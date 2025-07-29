@@ -48,7 +48,7 @@ export function EQSuggestionsDisplay({
           {suggestions.map((suggestion, index) => (
             <div 
               key={index} 
-              className="p-3 bg-background/50 rounded-md border border-border"
+              className="p-3 bg-background/50 dark:bg-slate-700/40 backdrop-blur-sm rounded-md border dark:border-slate-600/30"
             >
               <div className="flex justify-between items-center mb-2">
                 <span className="font-medium">
@@ -84,7 +84,7 @@ export function EQSuggestionsDisplay({
             </div>
           ))}
           
-          <div className="mt-4 p-3 bg-primary/10 rounded-md">
+          <div className="mt-4 p-3 bg-primary/10 dark:bg-primary/20 backdrop-blur-sm rounded-md border dark:border-primary/30">
             <h4 className="text-sm font-medium mb-1">How to apply these suggestions:</h4>
             <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1">
               <li>Use a parametric EQ plugin on each track</li>

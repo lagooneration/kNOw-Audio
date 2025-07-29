@@ -36,6 +36,7 @@ export interface AudioLibraryItem {
   name: string;
   color: string;
   isLoading?: boolean;
+  isPlaying?: boolean;
   error?: string;
   audioData?: AudioData;
 }

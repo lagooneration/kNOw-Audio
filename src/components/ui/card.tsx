@@ -8,7 +8,7 @@ interface CardProps {
 
 export function Card({ children, className }: CardProps) {
   return (
-    <div className={cn("bg-card rounded-lg border p-4 shadow-sm", className)}>
+    <div className={cn("bg-card dark:bg-slate-800/40 backdrop-blur-sm rounded-lg border dark:border-slate-700/50 p-4 shadow-sm", className)}>
       {children}
     </div>
   );
@@ -34,7 +34,7 @@ interface CardTitleProps {
 
 export function CardTitle({ children, className }: CardTitleProps) {
   return (
-    <h3 className={cn("text-lg font-semibold leading-none tracking-tight", className)}>
+    <h3 className={cn("text-lg font-semibold leading-none tracking-tight text-card-foreground dark:text-white/90", className)}>
       {children}
     </h3>
   );
@@ -47,7 +47,7 @@ interface CardDescriptionProps {
 
 export function CardDescription({ children, className }: CardDescriptionProps) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)}>
+    <p className={cn("text-sm text-muted-foreground dark:text-slate-300/70", className)}>
       {children}
     </p>
   );

@@ -78,7 +78,7 @@ export function MixingPage() {
   };
 
   return (
-    <div className="relative min-h-screen">
+    <div className="dark relative min-h-screen">
       <div className="fixed inset-0 z-0">
         <DarkVeil />
       </div>
@@ -86,7 +86,7 @@ export function MixingPage() {
       <Container className="relative z-10">
         <div className="max-w-6xl mx-auto space-y-8 py-8">
           <div className='text-center mb-8'>
-            <h1 className="text-3xl font-bold mb-4">Audio Mixer</h1>
+            <h1 className="text-3xl text-white/70 font-bold mb-4">Audio Mixer</h1>
             <p className="text-muted-foreground mb-8">
               Upload two audio tracks to analyze frequency overlaps and get EQ suggestions for better mixing.
             </p>
@@ -120,7 +120,7 @@ export function MixingPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h2 className="text-xl font-semibold mb-4">Track 1</h2>
+              <h2 className="text-xl text-white/70 font-semibold mb-4">Track 1</h2>
               {!mixingState.track1 ? (
                 <FileUpload 
                   onFileSelected={handleTrack1Selected} 
@@ -159,7 +159,7 @@ export function MixingPage() {
             </div>
             
             <div>
-              <h2 className="text-xl font-semibold mb-4">Track 2</h2>
+              <h2 className="text-xl text-white/70 font-semibold mb-4">Track 2</h2>
               {!mixingState.track2 ? (
                 <FileUpload 
                   onFileSelected={handleTrack2Selected} 
@@ -277,10 +277,10 @@ export function MixingPage() {
               )}
             </div>
           ) : (
-            <Card className="bg-muted/40 border border-dashed border-muted">
+            <Card className="bg-blue-900/20 border border-dashed border-muted">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <div className="text-4xl text-muted-foreground mb-4">🎛️ + 🎚️</div>
-                <h3 className="text-xl font-medium mb-2">Ready to Mix</h3>
+                <h3 className="text-xl text-white/70 font-medium mb-2">Ready to Mix</h3>
                 <p className="text-muted-foreground text-center max-w-md">
                   Upload two audio tracks to see where their frequencies overlap and get suggestions for better mixing.
                 </p>
