@@ -1,0 +1,169 @@
+/* Add this to index.css */
+
+/* Waveform buttons */
+.waveform-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.waveform-btn:hover {
+  background-color: rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.waveform-btn.active {
+  background-color: rgba(100, 200, 255, 0.2);
+  border-color: rgba(100, 200, 255, 0.6);
+  box-shadow: 0 0 10px rgba(100, 200, 255, 0.3);
+}
+
+/* Draggable audio items */
+.audio-item {
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.audio-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.audio-item:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.audio-drop-indicator {
+  pointer-events: none;
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  background-color: rgba(100, 200, 255, 0.2);
+  border: 2px dashed rgba(100, 200, 255, 0.6);
+  border-radius: 50%;
+  z-index: 1000;
+}
+
+/* Sidebar styles */
+.editor-sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10;
+  width: 60px;
+  overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.editor-sidebar:hover,
+.editor-sidebar.expanded {
+  width: 240px;
+}
+
+.sidebar-nav {
+  width: 60px;
+  border-right: 1px solid var(--border);
+  background-color: rgba(10, 10, 20, 0.7);
+  backdrop-filter: blur(10px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+}
+
+.sidebar-nav-item {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sidebar-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-nav-item.active {
+  background-color: var(--primary);
+  color: white;
+}
+
+.sidebar-nav-item .item-label {
+  position: absolute;
+  left: 50px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.editor-sidebar:hover .sidebar-nav-item .item-label,
+.editor-sidebar.expanded .sidebar-nav-item .item-label {
+  opacity: 1;
+}
+
+.sidebar-content {
+  position: absolute;
+  left: 60px;
+  top: 0;
+  bottom: 0;
+  width: 180px;
+  background-color: rgba(10, 10, 20, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 15px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+
+/* Visualization toggle */
+.scene-type-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 20px;
+}
+
+.scene-type-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.scene-type-options {
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background-color: rgba(10, 10, 20, 0.4);
+}
+
+.scene-type-option {
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  background-color: rgba(10, 10, 20, 0.6);
+  color: var(--muted-foreground);
+  transition: all 0.2s ease;
+}
+
+.scene-type-option:hover {
+  background-color: rgba(100, 100, 255, 0.1);
+}
+
+.scene-type-option.active {
+  background-color: var(--primary);
+  color: white;
+}

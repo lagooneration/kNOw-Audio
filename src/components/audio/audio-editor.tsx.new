@@ -7,7 +7,6 @@ import { EditorSidebar } from './editor-sidebar';
 import { EditorRightSidebar } from './editor-right-sidebar';
 import { EditorToolbar } from './editor-toolbar';
 import './editor-styles.css';
-import './mobile-styles.css';
 // Import visualization components
 import { CinematicScene } from '../visualization/cinematic-scene';
 import { SpectralAudioVisualizer } from '../visualization/spectral-audio-visualizer';
@@ -27,6 +26,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     addAudioFile,
     removeAudioFile,
     selectAudioFile,
+    createSpatialAudio,
     MAX_AUDIO_FILES
   } = useAudioLibrary();
   
@@ -72,9 +72,6 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     // Create analyzer
     const analyzer = new Tone.Analyser('fft', 512);
     
-    // Store references to dispose later
-    const playersToDispose = new Map<string, Tone.Player>();
-    
     // Save references
     reverbRef.current = reverb;
     delayRef.current = delay;
@@ -101,9 +98,8 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
       // Connect player to analyzer
       player.connect(analyzer);
       
-      // Store in playerRefs and for cleanup
+      // Store in playerRefs
       playerRefs.current.set(initialAudioId, player);
-      playersToDispose.set(initialAudioId, player);
       
       // Create spatial audio source
       const initialSource: SpatialAudioData = {
@@ -123,7 +119,8 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     // Cleanup
     return () => {
       // Dispose of all players
-      playersToDispose.forEach(player => {
+      const players = playerRefs.current;
+      players.forEach(player => {
         player.stop();
         player.dispose();
       });
@@ -200,100 +197,6 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     }
   }, [filterFreq]);
   
-  // Setup visualization
-  useEffect(() => {
-    if (!canvasRef.current || !analyzerRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    const analyzer = analyzerRef.current;
-    
-    // Track playback time
-    const updateTime = () => {
-      if (isPlaying) {
-        // Get current time from first player
-        const firstPlayer = playerRefs.current.values().next().value;
-        if (firstPlayer) {
-          setCurrentTime(firstPlayer.now());
-        }
-        requestAnimationFrame(updateTime);
-      }
-    };
-    
-    if (isPlaying) {
-      updateTime();
-    }
-    
-    // Resize canvas
-    const resizeCanvas = () => {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
-    };
-    
-    // Call resize initially
-    resizeCanvas();
-    
-    // Add resize listener
-    window.addEventListener('resize', resizeCanvas);
-    
-    // Draw function
-    const draw = () => {
-      animationRef.current = requestAnimationFrame(draw);
-      
-      // Get data from analyzer
-      const data = analyzer.getValue() as Float32Array;
-      
-      // Clear canvas
-      ctx.fillStyle = 'rgba(20, 20, 30, 0.2)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw waveform
-      ctx.strokeStyle = 'rgba(100, 120, 255, 0.8)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      
-      const sliceWidth = canvas.width / data.length;
-      let x = 0;
-      
-      for (let i = 0; i < data.length; i++) {
-        const v = (data[i] as number) / 100;
-        const y = (v * canvas.height / 2) + canvas.height / 2;
-        
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-        
-        x += sliceWidth;
-      }
-      
-      ctx.stroke();
-    };
-    
-    // Start drawing
-    draw();
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isPlaying]);
-  
-  // Handle adding a new audio file
-  const handleAddAudio = useCallback(async (file: File) => {
-    try {
-      await addAudioFile(file);
-    } catch (error) {
-      console.error("Error adding audio file:", error);
-    }
-  }, [addAudioFile]);
-  
   // Add initial audio if provided
   useEffect(() => {
     if (audioData && audioData.file) {
@@ -301,7 +204,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
         console.error("Error adding initial audio file:", error);
       });
     }
-  }, [audioData, handleAddAudio]);
+  }, [audioData]);
   
   // Toggle play/pause for all audio sources
   const togglePlayback = useCallback(() => {
@@ -341,6 +244,15 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     });
   }, []);
   
+  // Handle adding a new audio file
+  const handleAddAudio = useCallback(async (file: File) => {
+    try {
+      await addAudioFile(file);
+    } catch (error) {
+      console.error("Error adding audio file:", error);
+    }
+  }, [addAudioFile]);
+  
   // Handle placing audio in 3D space
   const handleAudioPlaced = useCallback((placement: AudioPlacement) => {
     setSpatialAudioSources(prevSources => {
@@ -356,43 +268,6 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
       });
     });
   }, []);
-  
-  // Handle audio dropped from library to canvas
-  const handleAudioDropped = useCallback((id: string, position: { x: number; y: number; z: number }) => {
-    // Find the audio item in the library
-    const audioItem = library.items.find(item => item.id === id);
-    if (!audioItem || !audioItem.audioData) return;
-    
-    // Check if the audio is already in the scene
-    const existingSource = spatialAudioSources.find(source => source.id === id);
-    if (existingSource) {
-      // Update position of existing source
-      handleAudioPlaced({
-        id,
-        position,
-        isDragging: false
-      });
-      return;
-    }
-    
-    // Create a new spatial audio source
-    const newSource: SpatialAudioData = {
-      ...audioItem.audioData,
-      id: audioItem.id,
-      name: audioItem.name,
-      color: audioItem.color,
-      position,
-      isPlaying: isPlaying,
-      volume: 1,
-      isSelected: true
-    };
-    
-    // Add to spatial sources
-    setSpatialAudioSources(prev => [...prev, newSource]);
-    
-    // Select this audio
-    selectAudioFile(id);
-  }, [library.items, spatialAudioSources, isPlaying, selectAudioFile, handleAudioPlaced]);
   
   // Handle selecting an audio in the 3D scene
   const handleAudioSelected = useCallback((id: string) => {
@@ -493,7 +368,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
   }, [isPlaying]);
   
   return (
-    <div className="visualization-container flex flex-col h-screen w-full dark text-foreground">
+    <div className="visualization-container flex flex-col h-[calc(100vh-14rem)]">
       <div className="flex flex-1 overflow-hidden relative">
         {/* Left Sidebar */}
         <EditorSidebar 
@@ -512,7 +387,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
         />
         
         {/* Main Editor Area */}
-        <div className="flex-1 overflow-hidden bg-background/10 backdrop-blur-md flex flex-col relative ml-[60px]">
+        <div className="flex-1 overflow-hidden bg-black/50 flex flex-col relative ml-[60px]">
           {/* Main Canvas */}
           <div className="flex-1 relative">
             <div className="absolute inset-0">
@@ -521,7 +396,6 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
                   audioSources={spatialAudioSources}
                   onAudioPlaced={handleAudioPlaced}
                   onAudioSelected={handleAudioSelected}
-                  onAudioDropped={handleAudioDropped}
                 />
               ) : visualizationType === 'cinematic' ? (
                 <Canvas camera={{ position: [0, 0, 15], fov: 60 }}>

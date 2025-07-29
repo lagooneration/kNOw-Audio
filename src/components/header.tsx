@@ -26,6 +26,11 @@ export function Header() {
                   3D Editor
                 </Link>
               </li>
+              <li>
+                <Link to="/spatial-audio" className="hover:text-primary transition-colors">
+                  Spatial Audio
+                </Link>
+              </li>
             </ul>
           </nav>
         </div>

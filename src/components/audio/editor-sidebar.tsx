@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { Button } from '../ui/button';
+import { AudioLibraryTab } from './audio-library-tab';
+import { type AudioLibraryItem } from '../../types/spatial-audio';
+import '../audio/editor-styles.css';
 
 interface EditorSidebarProps {
   activeTab: string;
@@ -13,8 +16,12 @@ interface EditorSidebarProps {
   onToggleEffect: (effect: string) => void;
   filterFreq: number;
   onFilterFreqChange: (value: number) => void;
-  visualizationMode: 'mathematical' | 'cinematic';
-  onVisualizationModeChange: (mode: 'mathematical' | 'cinematic') => void;
+  audioLibraryItems: AudioLibraryItem[];
+  selectedAudioItemId: string | null;
+  onAddAudio: (file: File) => Promise<void>;
+  onRemoveAudio: (id: string) => void;
+  onSelectAudio: (id: string) => void;
+  maxAudioFiles: number;
 }
 
 export function EditorSidebar({
@@ -24,39 +31,53 @@ export function EditorSidebar({
   onToggleEffect,
   filterFreq,
   onFilterFreqChange,
-  visualizationMode,
-  onVisualizationModeChange
+  audioLibraryItems,
+  selectedAudioItemId,
+  onAddAudio,
+  onRemoveAudio,
+  onSelectAudio,
+  maxAudioFiles
 }: EditorSidebarProps) {
+  const [expanded, setExpanded] = useState(false);
+
   const tabs = [
-    { id: 'effects', label: 'Effects' },
-    { id: 'visualization', label: 'Visualization' },
-    { id: 'mixing', label: 'Mixing' },
-    { id: 'export', label: 'Export' },
+    { id: 'library', label: 'Library', icon: '🎵' },
+    { id: 'effects', label: 'Effects', icon: '🎛️' },
+    { id: 'mixing', label: 'Mixing', icon: '🔊' },
+    { id: 'export', label: 'Export', icon: '💾' },
   ];
 
   return (
-    <div className="bg-secondary/20 border-r border-border w-60 flex flex-col h-full">
-      {/* Tabs */}
-      <div className="border-b border-border">
-        <div className="flex">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`px-4 py-2 text-sm font-medium ${
-                activeTab === tab.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-secondary/50'
-              }`}
-              onClick={() => onTabChange(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+    <div className={`editor-sidebar ${expanded ? 'expanded' : ''}`} 
+         onMouseEnter={() => setExpanded(true)}
+         onMouseLeave={() => setExpanded(false)}>
+      {/* Sidebar Nav */}
+      <div className="sidebar-nav">
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            className={`sidebar-nav-item ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => onTabChange(tab.id)}
+          >
+            <span className="item-icon">{tab.icon}</span>
+            <span className="item-label">{tab.label}</span>
+          </div>
+        ))}
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="sidebar-content">
+        {activeTab === 'library' && (
+          <AudioLibraryTab
+            audioItems={audioLibraryItems}
+            selectedItemId={selectedAudioItemId}
+            onAddAudio={onAddAudio}
+            onRemoveAudio={onRemoveAudio}
+            onSelectAudio={onSelectAudio}
+            maxFiles={maxAudioFiles}
+          />
+        )}
+        
         {activeTab === 'effects' && (
           <div className="space-y-4">
             <h3 className="text-sm font-medium mb-2">Audio Effects</h3>
@@ -113,63 +134,6 @@ export function EditorSidebar({
                 />
               </div>
             )}
-          </div>
-        )}
-
-        {activeTab === 'visualization' && (
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium mb-2">Visualization Mode</h3>
-            
-            <div className="scene-mode-switch" data-state={visualizationMode}>
-              <div 
-                className="scene-mode-option" 
-                data-active={visualizationMode === 'mathematical'} 
-                onClick={() => onVisualizationModeChange('mathematical')}
-              >
-                Analytical
-              </div>
-              <div 
-                className="scene-mode-option" 
-                data-active={visualizationMode === 'cinematic'} 
-                onClick={() => onVisualizationModeChange('cinematic')}
-              >
-                Cinematic
-              </div>
-            </div>
-            
-            <div className="pt-4 space-y-2">
-              <h4 className="text-xs font-medium">Visualization Parameters</h4>
-              
-              <div className="space-y-1">
-                <label className="text-xs">Intensity</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <label className="text-xs">Detail</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <label className="text-xs">Speed</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  className="w-full"
-                />
-              </div>
-            </div>
           </div>
         )}
 

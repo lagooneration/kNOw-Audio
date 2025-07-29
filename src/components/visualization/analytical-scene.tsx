@@ -6,9 +6,10 @@ import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import ThreeForceGraph from 'three-forcegraph';
 import * as Tone from 'tone';
 import { analyzeTonality, frequencyToColor, analyzeSpectralFeatures } from '../../utils/audio-analysis';
+import { spectralVertexShader, spectralFragmentShader } from '../../utils/audio-shaders';
 
 // Fragment shader for spectral analysis visualization
-const spectralFragmentShader = `
+const spectralFragmentShaderCustom = `
   uniform float time;
   uniform float audioIntensity;
   uniform sampler2D audioTexture;
@@ -62,7 +63,7 @@ const spectralFragmentShader = `
 `;
 
 // Vertex shader for spectral analysis visualization
-const spectralVertexShader = `
+const spectralVertexShaderCustom = `
   uniform float time;
   uniform float audioIntensity;
   uniform sampler2D audioTexture;
@@ -217,7 +218,7 @@ export function AnalyticalScene({ effects, analyzer, isPlaying = true }: Analyti
       localAnalyzerRef.current = audioAnalyzer;
     }
     
-    // Create shader material
+    // Create shader material with the imported shaders
     const shaderMaterial = new THREE.ShaderMaterial({
       uniforms,
       vertexShader: spectralVertexShader,
@@ -227,7 +228,7 @@ export function AnalyticalScene({ effects, analyzer, isPlaying = true }: Analyti
     });
     shaderMaterialRef.current = shaderMaterial;
     
-    // Create 3D spectrogram surface
+    // Create 3D spectrogram surface with higher resolution for better visualization
     const spectrogramGeometry = new THREE.PlaneGeometry(8, 6, 128, 64);
     spectrogramGeometry.rotateX(-Math.PI / 3); // Steeper tilt for mountain-like appearance
     const spectrogram = new THREE.Mesh(spectrogramGeometry, shaderMaterial);

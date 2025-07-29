@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import * as Tone from 'tone';
-import { Button } from '../ui/button';
 import { Knob } from '../ui/knob';
+import Switch from '../ui/Switch';
+import './oscillator-styles.css';
 
 interface OscillatorViewerProps {
   isEnabled: boolean;
@@ -63,6 +64,24 @@ export function OscillatorViewer({ isEnabled, onEnabledChange }: OscillatorViewe
     
     if (isEnabled) {
       oscillatorRef.current.stop();
+      
+      // When turning off, request a single animation frame to clear the display
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = 'rgba(20, 20, 30, 0.8)';
+          ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          
+          // Draw a flat line
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(60, 60, 80, 0.5)';
+          ctx.lineWidth = 1;
+          const y = canvasRef.current.height / 2;
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvasRef.current.width, y);
+          ctx.stroke();
+        }
+      }
     } else {
       oscillatorRef.current.start();
     }
@@ -81,13 +100,11 @@ export function OscillatorViewer({ isEnabled, onEnabledChange }: OscillatorViewe
   
   // Setup visualization
   useEffect(() => {
-    if (!canvasRef.current || !analyzerRef.current || !isEnabled) return;
+    if (!canvasRef.current) return;
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
-    const analyzer = analyzerRef.current;
     
     // Resize canvas
     const resizeCanvas = () => {
@@ -103,10 +120,29 @@ export function OscillatorViewer({ isEnabled, onEnabledChange }: OscillatorViewe
     
     // Draw function
     const draw = () => {
+      if (!isEnabled || !analyzerRef.current) {
+        // Clear canvas when oscillator is off
+        ctx.fillStyle = 'rgba(20, 20, 30, 0.8)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw a flat line
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(60, 60, 80, 0.5)';
+        ctx.lineWidth = 1;
+        const y = canvas.height / 2;
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+        
+        // Continue animation even when off
+        animationRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      
       animationRef.current = requestAnimationFrame(draw);
       
       // Get data from analyzer
-      const waveform = analyzer.getValue() as Float32Array;
+      const waveform = analyzerRef.current.getValue() as Float32Array;
       
       // Clear canvas
       ctx.fillStyle = 'rgba(20, 20, 30, 0.2)';
@@ -136,10 +172,8 @@ export function OscillatorViewer({ isEnabled, onEnabledChange }: OscillatorViewe
       ctx.stroke();
     };
     
-    // Start drawing if oscillator is enabled
-    if (isEnabled) {
-      draw();
-    }
+    // Start drawing always, but draw differently based on oscillator state
+    draw();
     
     // Cleanup
     return () => {
@@ -152,80 +186,106 @@ export function OscillatorViewer({ isEnabled, onEnabledChange }: OscillatorViewe
   
   return (
     <div className="p-3 bg-secondary/30 rounded-lg">
+      <div className="flex flex-row justify-between items-center gap-2">
       <h3 className="text-xs font-medium mb-2">Oscillator</h3>
-      
+          <Switch 
+            checked={isEnabled}
+            onChange={toggleOscillator}
+            label={isEnabled ? "ON" : "OFF"}
+          />
+          </div>
       <div className="flex flex-col gap-2">
         <div className="h-20">
           <canvas ref={canvasRef} className="w-full h-full bg-black/50 rounded-lg"></canvas>
         </div>
         
         <div className="flex justify-around mt-1">
-          <Knob
-            min={20}
-            max={2000}
-            value={frequency}
-            onChange={setFrequency}
-            label="Frequency"
-            unit="Hz"
-            size="sm"
-          />
+          <div className="text-center">
+            <div className="text-[9px] text-muted-foreground mb-1">Freq</div>
+            <Knob
+              min={20}
+              max={2000}
+              value={frequency}
+              onChange={setFrequency}
+              label=""
+              unit="Hz"
+              size="sm"
+            />
+          </div>
           
-          <Knob
-            min={-40}
-            max={0}
-            value={volume}
-            onChange={setVolume}
-            label="Volume"
-            unit="dB"
-            size="sm"
-          />
+          <div className="text-center">
+            <div className="text-[9px] text-muted-foreground mb-1">Vol</div>
+            <Knob
+              min={-40}
+              max={0}
+              value={volume}
+              onChange={setVolume}
+              label=""
+              unit="dB"
+              size="sm"
+            />
+          </div>
         </div>
         
-        <div className="flex flex-wrap gap-1 mt-1">
-          <Button 
-            variant={oscillatorType === 'sine' ? 'default' : 'outline'} 
+        <div className="flex flex-wrap gap-2 mt-2 justify-around">
+          <button 
+            className={`waveform-btn ${oscillatorType === 'sine' ? 'active' : ''}`}
             onClick={() => setOscillatorType('sine')}
-            size="sm"
-            className="text-xs px-2 py-1 h-6"
+            title="Sine Wave"
           >
-            Sine
-          </Button>
-          <Button 
-            variant={oscillatorType === 'square' ? 'default' : 'outline'} 
+            <img 
+              src="/images/sine.svg" 
+              alt="Sine" 
+              width="24" 
+              height="24" 
+              className={`waveform-icon ${oscillatorType === 'sine' ? 'active' : ''}`}
+            />
+          </button>
+          <button 
+            className={`waveform-btn ${oscillatorType === 'square' ? 'active' : ''}`}
             onClick={() => setOscillatorType('square')}
-            size="sm"
-            className="text-xs px-2 py-1 h-6"
+            title="Square Wave"
           >
-            Square
-          </Button>
-          <Button 
-            variant={oscillatorType === 'triangle' ? 'default' : 'outline'} 
+            <img 
+              src="/images/square.svg" 
+              alt="Square" 
+              width="24" 
+              height="24" 
+              className={`waveform-icon ${oscillatorType === 'square' ? 'active' : ''}`}
+            />
+          </button>
+          <button 
+            className={`waveform-btn ${oscillatorType === 'triangle' ? 'active' : ''}`}
             onClick={() => setOscillatorType('triangle')}
-            size="sm"
-            className="text-xs px-2 py-1 h-6"
+            title="Triangle Wave"
           >
-            Triangle
-          </Button>
-          <Button 
-            variant={oscillatorType === 'sawtooth' ? 'default' : 'outline'} 
+            <img 
+              src="/images/triangle.svg" 
+              alt="Triangle" 
+              width="24" 
+              height="24" 
+              className={`waveform-icon ${oscillatorType === 'triangle' ? 'active' : ''}`}
+            />
+          </button>
+          <button 
+            className={`waveform-btn ${oscillatorType === 'sawtooth' ? 'active' : ''}`}
             onClick={() => setOscillatorType('sawtooth')}
-            size="sm"
-            className="text-xs px-2 py-1 h-6"
+            title="Sawtooth Wave"
           >
-            Saw
-          </Button>
+            <img 
+              src="/images/saw.svg" 
+              alt="Sawtooth" 
+              width="24" 
+              height="24" 
+              className={`waveform-icon ${oscillatorType === 'sawtooth' ? 'active' : ''}`}
+            />
+          </button>
         </div>
         
-        <Button 
-          onClick={toggleOscillator} 
-          size="sm"
-          className="mt-1 h-7 text-xs"
-        >
-          {isEnabled ? 'Stop Oscillator' : 'Start Oscillator'}
-        </Button>
+        
         
         <div className="mt-3 border-t border-border/50 pt-2">
-          <h4 className="text-xs font-medium mb-1 text-muted-foreground">Coming Soon</h4>
+          <h4 className="coming-soon-title">Coming Soon</h4>
           <div className="feature-item">
             <span className="feature-icon">🎹</span>
             <span className="text-xs">MIDI Input</span>

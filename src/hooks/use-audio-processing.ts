@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { type AudioData } from '../types/audio';
 import { processAudioFile } from '../utils/audio-processing';
 
+// Keep this hook for backward compatibility, but use use-audio-library.ts for new features
 export function useAudioProcessing() {
   const [audioData, setAudioData] = useState<AudioData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);

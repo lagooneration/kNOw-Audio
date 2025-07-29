@@ -1,4 +1,4 @@
-import { Button } from '../ui/button';
+import '../audio/editor-styles.css';
 
 // Format time in seconds to mm:ss format
 const formatTime = (timeInSeconds: number): string => {
@@ -8,29 +8,33 @@ const formatTime = (timeInSeconds: number): string => {
 };
 
 interface EditorToolbarProps {
-  visualizationMode: 'frequency' | 'waveform';
-  onVisualizationModeChange: (mode: 'frequency' | 'waveform') => void;
+  visualizationType: 'mathematical' | 'cinematic' | 'spatial';
+  onVisualizationTypeChange: (type: 'mathematical' | 'cinematic' | 'spatial') => void;
   playbackSpeed?: number;
   onPlaybackSpeedChange?: (speed: number) => void;
   currentTime?: number;
   totalDuration?: number;
+  isPlaying?: boolean;
+  onPlayPause?: () => void;
 }
 
 export function EditorToolbar({ 
-  visualizationMode, 
-  onVisualizationModeChange,
+  visualizationType,
+  onVisualizationTypeChange,
   playbackSpeed = 1,
   onPlaybackSpeedChange = () => {},
   currentTime = 0,
-  totalDuration = 0
+  totalDuration = 0,
+  isPlaying = false,
+  onPlayPause = () => {}
 }: EditorToolbarProps) {
   return (
-    <div className="bg-secondary/30 border-t border-border h-14 flex items-center px-4 justify-between">
+    <div className="bg-background/60 backdrop-blur-md border-t border-border h-14 flex items-center px-4 justify-between">
       <div className="flex items-center space-x-4 text-sm">
         <div className="flex items-center space-x-2">
           <span className="text-xs text-muted-foreground">Playback Speed:</span>
           <select 
-            className="h-7 px-2 text-xs bg-background border border-border rounded-md"
+            className="h-7 px-2 text-xs bg-background/80 border border-border rounded-md"
             value={playbackSpeed}
             onChange={(e) => onPlaybackSpeedChange(parseFloat(e.target.value))}
           >
@@ -42,6 +46,19 @@ export function EditorToolbar({
         </div>
         
         <div className="h-6 w-px bg-border"></div>
+         {/* Play/Pause Button */}
+        <button
+          className="bg-primary/60 hover:bg-primary/80 text-white rounded-full p-1 shadow-md flex items-center justify-center w-10 h-10 mr-4"
+          onClick={onPlayPause}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+            {isPlaying ? (
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+            ) : (
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+            )}
+          </svg>
+        </button>
         
         <div className="flex items-center space-x-2">
           <span className="text-xs text-muted-foreground">Time:</span>
@@ -52,24 +69,30 @@ export function EditorToolbar({
       </div>
       
       <div className="flex items-center space-x-4">
+       
+        
         <div className="flex items-center space-x-2">
           <span className="text-xs text-muted-foreground">Visualization:</span>
-          <Button 
-            variant={visualizationMode === 'frequency' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => onVisualizationModeChange('frequency')}
-            className="h-7 px-3 text-xs"
-          >
-            Frequency
-          </Button>
-          <Button 
-            variant={visualizationMode === 'waveform' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => onVisualizationModeChange('waveform')}
-            className="h-7 px-3 text-xs"
-          >
-            Waveform
-          </Button>
+          <div className="scene-type-options">
+            <div 
+              className={`scene-type-option ${visualizationType === 'mathematical' ? 'active' : ''}`}
+              onClick={() => onVisualizationTypeChange('mathematical')}
+            >
+              Analytical
+            </div>
+            <div 
+              className={`scene-type-option ${visualizationType === 'spatial' ? 'active' : ''}`}
+              onClick={() => onVisualizationTypeChange('spatial')}
+            >
+              Spatial
+            </div>
+            <div 
+              className={`scene-type-option ${visualizationType === 'cinematic' ? 'active' : ''}`}
+              onClick={() => onVisualizationTypeChange('cinematic')}
+            >
+              Cinematic
+            </div>
+          </div>
         </div>
       </div>
     </div>

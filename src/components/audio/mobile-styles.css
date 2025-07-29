@@ -1,0 +1,70 @@
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .editor-sidebar {
+    width: 50px;
+  }
+  
+  .editor-sidebar:hover,
+  .editor-sidebar.expanded {
+    width: 200px;
+  }
+  
+  .sidebar-nav {
+    width: 50px;
+  }
+  
+  .sidebar-content {
+    left: 50px;
+    width: 150px;
+  }
+  
+  .sidebar-nav-item {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 10px;
+  }
+  
+  .sidebar-nav-item .item-label {
+    left: 40px;
+    font-size: 12px;
+  }
+
+  /* Main area adjustments */
+  .visualization-container [class*="ml-[60px]"] {
+    margin-left: 50px !important;
+  }
+  
+  /* Toolbar adjustments */
+  .scene-type-option {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .scene-type-label {
+    display: none;
+  }
+  
+  .h-14 {
+    height: 3.5rem;
+  }
+  
+  .space-x-4 > * + * {
+    margin-left: 0.5rem;
+  }
+  
+  .space-x-2 > * + * {
+    margin-left: 0.25rem;
+  }
+  
+  .text-xs {
+    font-size: 0.65rem;
+  }
+  
+  /* Hide some elements on very small screens */
+  .visualization-container .h-screen {
+    height: calc(100vh - 0.5rem);
+  }
+}

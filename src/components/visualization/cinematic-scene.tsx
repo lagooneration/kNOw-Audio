@@ -1,85 +1,7 @@
-import { useRef, useEffect, useMemo, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import * as Tone from 'tone';
-import { analyzeTonality } from '../../utils/audio-analysis';
-
-// Fragment shader for cinematic audio visualization
-const cinematicFragmentShader = `
-  uniform float time;
-  uniform float audioIntensity;
-  uniform vec3 baseColor;
-  uniform vec3 accentColor;
-  uniform sampler2D audioTexture;
-  uniform float pulseRate;
-  varying vec2 vUv;
-
-  // Noise function
-  float noise(vec2 p) {
-    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-  }
-
-  void main() {
-    // Get audio data from texture
-    float audioValue = texture2D(audioTexture, vec2(vUv.x, 0.0)).r;
-    
-    // Create multiple layers of visual effects
-    vec2 center = vec2(0.5, 0.5);
-    float dist = distance(vUv, center);
-    
-    // Ripple effect based on audio
-    float ripple = sin(dist * 50.0 - time * pulseRate) * 0.5 + 0.5;
-    
-    // Noise pattern
-    float noisePattern = noise(vUv * 10.0 + time * 0.1) * 0.1;
-    
-    // Color gradient based on distance from center
-    vec3 gradientColor = mix(accentColor, baseColor, smoothstep(0.0, 0.8, dist));
-    
-    // Mix audio intensity into the color
-    float intensity = audioValue * audioIntensity;
-    vec3 color = mix(gradientColor, vec3(1.0), intensity * ripple * (1.0 - dist * 1.2));
-    
-    // Add glow effect
-    float glow = smoothstep(0.4, 0.0, dist) * intensity;
-    color += baseColor * glow * 2.0;
-    
-    // Add noise detail
-    color += noisePattern * intensity;
-    
-    // Vignette effect
-    float vignette = smoothstep(1.0, 0.5, dist);
-    color *= vignette;
-    
-    gl_FragColor = vec4(color, 1.0);
-  }
-`;
-
-// Vertex shader for cinematic audio visualization
-const cinematicVertexShader = `
-  varying vec2 vUv;
-  uniform float time;
-  uniform float audioIntensity;
-  uniform sampler2D audioTexture;
-  
-  void main() {
-    vUv = uv;
-    
-    // Get audio data from texture for this vertex
-    float audioValue = texture2D(audioTexture, vec2(position.x * 0.5 + 0.5, 0.0)).r;
-    
-    // Apply audio data to vertex position for waveform effect
-    vec3 newPosition = position;
-    if (audioIntensity > 0.1) {
-      // Create more organic movement
-      float displacement = sin(position.x * 10.0 + time) * audioValue * audioIntensity * 0.3;
-      displacement += cos(position.y * 8.0 + time * 0.7) * audioValue * audioIntensity * 0.2;
-      newPosition.z += displacement;
-    }
-    
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
-  }
-`;
 
 interface CinematicSceneProps {
   effects: {
@@ -92,289 +14,106 @@ interface CinematicSceneProps {
   isPlaying?: boolean;
 }
 
-export function CinematicScene({ effects, analyzer, isPlaying = true }: CinematicSceneProps) {
-  const shaderMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
-  const sphereRef = useRef<THREE.Mesh | null>(null);
-  const particlesRef = useRef<THREE.Points | null>(null);
+export function CinematicScene({ analyzer }: CinematicSceneProps) {
   const localAnalyzerRef = useRef<Tone.Analyser | null>(null);
-  const [tonalityInfo, setTonalityInfo] = useState({ 
-    isMajor: true, 
-    isMinor: false, 
-    lowFrequencyImpact: 0 
-  });
-  const frameCountRef = useRef(0);
   
-  // Create a data texture for audio data
-  const audioDataTexture = useMemo(() => {
-    const size = 256;
-    const data = new Float32Array(size * 4);
-    // Fill with initial data
-    for (let i = 0; i < size; i++) {
-      const stride = i * 4;
-      data[stride] = 0;
-      data[stride + 1] = 0;
-      data[stride + 2] = 0;
-      data[stride + 3] = 1;
-    }
-    const texture = new THREE.DataTexture(
-      data,
-      size,
-      1,
-      THREE.RGBAFormat,
-      THREE.FloatType
-    );
-    texture.needsUpdate = true;
-    return texture;
-  }, []);
-  
-  // Create shader uniforms
-  const uniforms = useMemo(() => ({
-    time: { value: 0 },
-    audioIntensity: { value: 0.5 },
-    baseColor: { value: new THREE.Color(0x4a88ff) },
-    accentColor: { value: new THREE.Color(0x1a28ff) },
-    audioTexture: { value: audioDataTexture },
-    pulseRate: { value: 2.0 }
-  }), [audioDataTexture]);
-  
-  // Setup analyzer and visualization elements
+  // Create a placeholder for the cinematic scene
   useEffect(() => {
     // Use provided analyzer or create a local one if needed
     const audioAnalyzer = analyzer || new Tone.Analyser('fft', 256);
-    if (!analyzer) {
+    if (!analyzer && !localAnalyzerRef.current) {
       localAnalyzerRef.current = audioAnalyzer;
     }
     
-    // Create a shader material
-    const shaderMaterial = new THREE.ShaderMaterial({
-      uniforms,
-      vertexShader: cinematicVertexShader,
-      fragmentShader: cinematicFragmentShader,
-      transparent: true,
-    });
-    
-    // Create a sphere with shader material
-    const sphereGeometry = new THREE.SphereGeometry(2, 128, 128);
-    const sphere = new THREE.Mesh(sphereGeometry, shaderMaterial);
-    shaderMaterialRef.current = shaderMaterial;
-    sphereRef.current = sphere;
-    
-    // Create particles for environment
-    const particleCount = 3000;
-    const particleGeometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-    
-    for (let i = 0; i < particleCount; i++) {
-      const i3 = i * 3;
-      
-      // Create a spherical distribution
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      const radius = 5 + Math.random() * 15; // Between 5 and 20
-      
-      positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
-      positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-      positions[i3 + 2] = radius * Math.cos(phi);
-      
-      // Add some color variation
-      colors[i3] = 0.5 + Math.random() * 0.5; // R: 0.5-1.0
-      colors[i3 + 1] = 0.5 + Math.random() * 0.5; // G: 0.5-1.0
-      colors[i3 + 2] = 0.5 + Math.random() * 0.5; // B: 0.5-1.0
-    }
-    
-    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    
-    const particleMaterial = new THREE.PointsMaterial({
-      size: 0.1,
-      transparent: true,
-      opacity: 0.7,
-      vertexColors: true,
-      blending: THREE.AdditiveBlending
-    });
-    
-    const particles = new THREE.Points(particleGeometry, particleMaterial);
-    particlesRef.current = particles;
-    
-    // Clean up
+    // Cleanup
     return () => {
       if (localAnalyzerRef.current) {
         localAnalyzerRef.current.dispose();
       }
-      
-      if (shaderMaterialRef.current) {
-        shaderMaterialRef.current.dispose();
-      }
-      
-      if (particleGeometry) {
-        particleGeometry.dispose();
-      }
-      
-      if (particleMaterial) {
-        particleMaterial.dispose();
-      }
     };
-  }, [uniforms, analyzer]);
+  }, [analyzer]);
   
-  // Update visualization based on effects
-  useEffect(() => {
-    if (!sphereRef.current || !particlesRef.current || !shaderMaterialRef.current) return;
+  // Create a text message as a placeholder
+  const PlaceholderText = () => {
+    const mesh = useRef<THREE.Mesh>(null);
     
-    const shaderMaterial = shaderMaterialRef.current;
-    const particles = particlesRef.current;
+    useFrame(() => {
+      if (mesh.current) {
+        mesh.current.rotation.y += 0.005;
+      }
+    });
     
-    // Change material properties based on active effects
-    const baseColorValue = shaderMaterial.uniforms.baseColor.value;
-    const accentColorValue = shaderMaterial.uniforms.accentColor.value;
-    
-    if (effects.reverb) {
-      baseColorValue.setHSL(0.6, 0.8, 0.5); // Vibrant blue
-      accentColorValue.setHSL(0.7, 0.9, 0.3); // Deep blue accent
-      shaderMaterial.uniforms.audioIntensity.value = 0.8;
-      shaderMaterial.uniforms.pulseRate.value = 3.0;
-    } else {
-      baseColorValue.setHSL(0.6, 0.6, 0.4); // Regular blue
-      accentColorValue.setHSL(0.55, 0.7, 0.2); // Subtle accent
-      shaderMaterial.uniforms.audioIntensity.value = 0.5;
-      shaderMaterial.uniforms.pulseRate.value = 2.0;
-    }
-    
-    if (effects.distortion) {
-      shaderMaterial.uniforms.audioIntensity.value *= 1.5;
-    }
-    
-    const particleMaterial = particles.material as THREE.PointsMaterial;
-    
-    if (effects.delay) {
-      particleMaterial.size = 0.15;
-      particleMaterial.opacity = 0.9;
-    } else {
-      particleMaterial.size = 0.1;
-      particleMaterial.opacity = 0.7;
-    }
-    
-    if (effects.filter) {
-      baseColorValue.offsetHSL(0.1, 0, 0); // Shift hue slightly
-    }
-    
-    // Adjust colors based on tonality
-    if (tonalityInfo.isMinor) {
-      // For minor keys, shift colors towards red
-      baseColorValue.offsetHSL(-0.5, 0.1, 0); // Move to red spectrum
-      accentColorValue.offsetHSL(-0.4, 0.2, 0);
-    } else {
-      // For major keys, stay in blue spectrum or shift towards cooler blues
-      baseColorValue.offsetHSL(0.1, 0, 0);
-      accentColorValue.offsetHSL(0.05, 0, 0);
-    }
-    
-  }, [effects, tonalityInfo]);
+    return (
+      <mesh ref={mesh} position={[0, 0, 0]}>
+        <planeGeometry args={[10, 5]} />
+        <meshBasicMaterial>
+          <canvasTexture 
+            attach="map" 
+            args={[createTextCanvas("Cinematic View Coming Soon", "#ffffff")]} 
+          />
+        </meshBasicMaterial>
+      </mesh>
+    );
+  };
   
-  // Use frame for animation and audio data update
-  useFrame(({ clock, scene }) => {
-    frameCountRef.current += 1;
+  // Helper function to create text canvas
+  function createTextCanvas(text: string, color: string) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 512;
+    const context = canvas.getContext('2d');
     
-    if (!sphereRef.current || !particlesRef.current || !shaderMaterialRef.current) return;
-    
-    const sphere = sphereRef.current;
-    const particles = particlesRef.current;
-    const shaderMaterial = shaderMaterialRef.current;
-    
-    // Add sphere and particles to scene if not already added
-    if (!scene.children.includes(sphere)) {
-      scene.add(sphere);
-    }
-    
-    if (!scene.children.includes(particles)) {
-      scene.add(particles);
-    }
-    
-    // Update shader time uniform
-    shaderMaterial.uniforms.time.value = clock.getElapsedTime();
-    
-    // Stop visualization if audio is paused
-    if (!isPlaying) {
-      // Set low audio intensity when paused for static display
-      if (shaderMaterial.uniforms.audioIntensity.value > 0.1) {
-        shaderMaterial.uniforms.audioIntensity.value = 0.1;
+    if (context) {
+      context.fillStyle = '#000033';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Add a gradient background
+      const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#000044');
+      gradient.addColorStop(1, '#000022');
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Add grid lines
+      context.strokeStyle = '#1a1a55';
+      context.lineWidth = 2;
+      
+      // Horizontal lines
+      for (let y = 50; y < canvas.height; y += 50) {
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(canvas.width, y);
+        context.stroke();
       }
       
-      // Reset sphere rotation to a static position
-      sphere.rotation.x = 0.1;
-      sphere.rotation.y = 0.1;
-      
-      // Keep particles static
-      particles.rotation.y = 0;
-      
-      return; // Skip the rest of the animation when paused
-    }
-    
-    // Animate the sphere with subtle movements
-    sphere.rotation.x = Math.sin(clock.getElapsedTime() * 0.3) * 0.2;
-    sphere.rotation.y = Math.sin(clock.getElapsedTime() * 0.2) * 0.3;
-    
-    // Animate the particles - slow rotation
-    particles.rotation.y = clock.getElapsedTime() * 0.03;
-    
-    // Get the appropriate analyzer
-    const activeAnalyzer = analyzer || localAnalyzerRef.current;
-    
-    // If we have analyzer data, update the audio texture
-    if (activeAnalyzer) {
-      const audioData = activeAnalyzer.getValue() as Float32Array;
-      if (audioData) {
-        // Update the data texture with new audio data
-        const textureData = shaderMaterial.uniforms.audioTexture.value.image.data;
-        const dataSize = Math.min(audioData.length, textureData.length / 4);
-        
-        for (let i = 0; i < dataSize; i++) {
-          const value = (audioData[i] as number + 140) / 140; // Normalize
-          const stride = i * 4;
-          textureData[stride] = value;     // R
-          textureData[stride + 1] = value; // G
-          textureData[stride + 2] = value; // B
-          textureData[stride + 3] = 1;     // A
-        }
-        
-        shaderMaterial.uniforms.audioTexture.value.needsUpdate = true;
-        
-        // Scale the intensity based on average audio level
-        let sum = 0;
-        for (let i = 0; i < dataSize; i++) {
-          sum += (audioData[i] as number + 140) / 140;
-        }
-        const avg = sum / dataSize;
-        
-        // Smooth changes to intensity
-        const currentIntensity = shaderMaterial.uniforms.audioIntensity.value;
-        const targetIntensity = effects.distortion ? avg * 1.5 : avg;
-        shaderMaterial.uniforms.audioIntensity.value = 
-          currentIntensity * 0.9 + targetIntensity * 0.1;
-          
-        // Update tonality analysis once every few frames for performance
-        if (frameCountRef.current % 30 === 0) {
-          const tonality = analyzeTonality(audioData);
-          setTonalityInfo({
-            isMajor: tonality.isMajor,
-            isMinor: tonality.isMinor,
-            lowFrequencyImpact: tonality.lowFrequencyImpact
-          });
-          
-          // Low frequency impact visualization (kick drums, etc)
-          if (tonality.lowFrequencyImpact > 0.2) {
-            // Pulse the background particles on low frequency impacts
-            const particleMaterial = particles.material as THREE.PointsMaterial;
-            particleMaterial.size = 0.1 + tonality.lowFrequencyImpact * 0.2;
-            
-            // Create a flashing effect
-            const flashIntensity = tonality.lowFrequencyImpact;
-            particleMaterial.opacity = 0.7 + flashIntensity * 0.3;
-          }
-        }
+      // Vertical lines
+      for (let x = 50; x < canvas.width; x += 50) {
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.lineTo(x, canvas.height);
+        context.stroke();
       }
+      
+      // Add text
+      context.font = 'bold 72px Arial, sans-serif';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillStyle = color;
+      context.fillText(text, canvas.width / 2, canvas.height / 2);
+      
+      // Add subtitle
+      context.font = '36px Arial, sans-serif';
+      context.fillText('Use the Analytical scene for 3D spectral visualization', canvas.width / 2, canvas.height / 2 + 100);
     }
-  });
+    
+    return canvas;
+  }
   
-  return null;
+  return (
+    <>
+      <ambientLight intensity={0.5} />
+      <pointLight position={[10, 10, 10]} />
+      <PlaceholderText />
+    </>
+  );
 }

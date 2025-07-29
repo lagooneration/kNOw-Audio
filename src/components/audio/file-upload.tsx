@@ -106,13 +106,13 @@ export function FileUpload({
 
           <div className="space-y-2">
             <p className="text-base font-medium text-white">
-              {isProcessing ? 'Processing audio file...' : 'Drop your audio here or browse'}
+              {isProcessing ? 'Processing audio file...' : 'Upload'}
             </p>
             <p className="text-sm text-slate-400">
-              Support files: MP3, WAV, OGG, FLAC
+              MP3, WAV, OGG, FLAC
             </p>
             <p className="text-xs text-slate-400">
-              Max file size: {Math.round(maxSize / (1024 * 1024))}MB
+              Upto {Math.round(maxSize / (1024 * 1024))}MB
             </p>
             
             {error && (
