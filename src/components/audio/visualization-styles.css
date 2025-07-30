@@ -1,0 +1,73 @@
+.visualization-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mini-waveform-container {
+  border-radius: 6px;
+  border: 1px solid rgba(100, 255, 200, 0.2);
+  box-shadow: 0 0 15px rgba(20, 230, 180, 0.3);
+}
+
+.play-control {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 10;
+}
+
+.lcd-display {
+  background: linear-gradient(to bottom, rgba(10, 20, 30, 0.9), rgba(0, 10, 20, 0.9));
+  border: 1px solid rgba(100, 200, 255, 0.2);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 0 12px rgba(0, 150, 200, 0.2);
+}
+
+.three-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.spectral-preview {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, rgba(30, 40, 80, 0.4), rgba(20, 30, 60, 0.5));
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.spectral-preview::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 30% 50%, rgba(99, 102, 241, 0.4) 0%, transparent 50%),
+    radial-gradient(circle at 70% 50%, rgba(129, 140, 248, 0.3) 0%, transparent 50%);
+  opacity: 0.7;
+}
+
+/* Animation for active visualization */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(30, 210, 180, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(30, 210, 180, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(30, 210, 180, 0);
+  }
+}
+
+.active-visual {
+  animation: pulse 1.5s infinite;
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type AudioData } from '../../types/audio';
 
 interface SpectrogramProps {
@@ -7,6 +7,8 @@ interface SpectrogramProps {
   width?: number;
   colorMap?: string[];
   showScale?: boolean;
+  externalAudio?: HTMLAudioElement;
+  sharedAnalyser?: AnalyserNode | null;
 }
 
 export function Spectrogram({
@@ -21,42 +23,81 @@ export function Spectrogram({
     'rgba(255, 255, 0, 1)',
     'rgba(255, 0, 0, 1)'
   ],
-  showScale = true
+  showScale = true,
+  externalAudio,
+  sharedAnalyser
 }: SpectrogramProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const animationRef = useRef<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const xPosRef = useRef(0);
 
+  // Set up the audio context and analyzer
   useEffect(() => {
     if (!canvasRef.current) return;
     
-    // Setup audio context and analyzer
-    const audioContext = new AudioContext();
-    const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
+    // Use shared analyser if provided, otherwise create our own
+    if (sharedAnalyser) {
+      analyserRef.current = sharedAnalyser;
+    } else {
+      // Setup audio context and analyzer
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      
+      // Configure analyzer
+      analyser.minDecibels = -90;
+      analyser.maxDecibels = -10;
+      analyser.smoothingTimeConstant = 0.85;
+      
+      // Handle audio source based on whether external audio is provided
+      if (externalAudio) {
+        // Use external audio element
+        try {
+          // Only create a new source if we're not using a shared analyser
+          const source = audioContext.createMediaElementSource(externalAudio);
+          source.connect(analyser);
+          analyser.connect(audioContext.destination);
+        } catch (err) {
+          console.warn('Audio element already connected, cannot create new MediaElementSource');
+        }
+      } else {
+        // Create source from the audio buffer
+        const source = audioContext.createBufferSource();
+        source.buffer = audioData.buffer;
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+        
+        // Don't start playback automatically
+        // Only play when user clicks play button
+        setIsPlaying(false);
+        
+        // Save reference
+        sourceRef.current = source;
+      }
+      
+      // Save references
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+    }
     
-    // Configure analyzer
-    analyser.minDecibels = -90;
-    analyser.maxDecibels = -10;
-    analyser.smoothingTimeConstant = 0.85;
-    
-    // Create source from the audio buffer
-    const source = audioContext.createBufferSource();
-    source.buffer = audioData.buffer;
-    source.connect(analyser);
-    analyser.connect(audioContext.destination);
-    
-    // Start playback
-    source.start();
-    
-    // Save references
-    audioContextRef.current = audioContext;
-    analyserRef.current = analyser;
-    sourceRef.current = source;
+    // Monitor external audio playback state
+    let playbackStateHandler: (() => void) | undefined;
+    if (externalAudio) {
+      playbackStateHandler = () => {
+        setIsPlaying(!externalAudio.paused);
+      };
+      
+      externalAudio.addEventListener('play', playbackStateHandler);
+      externalAudio.addEventListener('pause', playbackStateHandler);
+      externalAudio.addEventListener('ended', playbackStateHandler);
+      
+      // Initial state
+      setIsPlaying(!externalAudio.paused);
+    }
     
     // Setup canvas
     const canvas = canvasRef.current;
@@ -71,8 +112,83 @@ export function Spectrogram({
     canvasCtx.fillStyle = 'black';
     canvasCtx.fillRect(0, 0, width, height);
     
-    // Position tracker
-    let xPos = 0;
+    // Draw frequency scale if enabled
+    if (showScale) {
+      canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      canvasCtx.font = '10px Arial';
+      canvasCtx.textAlign = 'right';
+      
+      const nyquist = audioData.buffer.sampleRate / 2;
+      const labelCount = 5;
+      
+      for (let i = 0; i <= labelCount; i++) {
+        const freq = (i / labelCount) * nyquist;
+        const y = height - (i / labelCount) * height;
+        
+        canvasCtx.fillText(
+          freq >= 1000 ? `${(freq / 1000).toFixed(1)}kHz` : `${Math.round(freq)}Hz`,
+          40,
+          y
+        );
+      }
+    }
+    
+    // Cleanup
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      
+      if (sourceRef.current) {
+        try {
+          sourceRef.current.stop();
+        } catch {
+          // Ignore if already stopped
+        }
+      }
+      
+      // Only close the audio context if we created it ourselves
+      if (audioContextRef.current && !sharedAnalyser) {
+        audioContextRef.current.close();
+      }
+      
+      // Remove event listeners if using external audio
+      if (externalAudio && playbackStateHandler) {
+        externalAudio.removeEventListener('play', playbackStateHandler);
+        externalAudio.removeEventListener('pause', playbackStateHandler);
+        externalAudio.removeEventListener('ended', playbackStateHandler);
+      }
+    };
+  }, [audioData, height, width, colorMap, showScale, externalAudio, sharedAnalyser]);
+  
+  // Start or stop the animation based on playback state
+  useEffect(() => {
+    if (!isPlaying || !analyserRef.current || !canvasRef.current) return;
+    
+    // If using internal source and not using external audio, start it when play button is clicked
+    if (!externalAudio && sourceRef.current && audioContextRef.current) {
+      try {
+        // Create a new source node
+        const newSource = audioContextRef.current.createBufferSource();
+        newSource.buffer = audioData.buffer;
+        newSource.connect(analyserRef.current);
+        analyserRef.current.connect(audioContextRef.current.destination);
+        newSource.start();
+        
+        // Store the new source
+        sourceRef.current = newSource;
+      } catch (error) {
+        console.error('Error starting audio source:', error);
+      }
+    }
+    
+    const canvas = canvasRef.current;
+    const canvasCtx = canvas.getContext('2d');
+    if (!canvasCtx) return;
+    
+    const analyser = analyserRef.current;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
     
     // Create the color map function
     const getColor = (value: number) => {
@@ -114,6 +230,10 @@ export function Spectrogram({
     
     // Draw spectrogram
     const draw = () => {
+      if (!analyserRef.current || !canvasRef.current || !isPlaying) {
+        return;
+      }
+      
       animationRef.current = requestAnimationFrame(draw);
       
       analyser.getByteFrequencyData(dataArray);
@@ -147,14 +267,14 @@ export function Spectrogram({
       }
       
       // Put image data
-      canvasCtx.putImageData(imageData, xPos, 0);
+      canvasCtx.putImageData(imageData, xPosRef.current, 0);
       
       // Increment x position
-      xPos = (xPos + 1) % width;
+      xPosRef.current = (xPosRef.current + 1) % width;
       
       // Draw vertical line at current position
       canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      canvasCtx.fillRect(xPos, 0, 1, height);
+      canvasCtx.fillRect(xPosRef.current, 0, 1, height);
       
       // Draw frequency scale
       if (showScale) {
@@ -171,7 +291,7 @@ export function Spectrogram({
         canvasCtx.textAlign = 'left';
         
         const labelCount = 10;
-        const step = Math.floor(audioContext.sampleRate / 2 / labelCount);
+        const step = Math.floor(audioContextRef.current!.sampleRate / 2 / labelCount);
         
         for (let i = 0; i <= labelCount; i++) {
           const freq = Math.floor(i * step);
@@ -196,17 +316,10 @@ export function Spectrogram({
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
-      }
-      
-      if (sourceRef.current) {
-        sourceRef.current.stop();
-      }
-      
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
+        animationRef.current = null;
       }
     };
-  }, [audioData, height, width, colorMap, showScale]);
+  }, [isPlaying, colorMap, height, width, showScale, audioData, externalAudio]);
   
   return (
     <div className="spectrogram">

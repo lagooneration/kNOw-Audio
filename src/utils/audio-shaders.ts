@@ -1,5 +1,5 @@
 // Vertex and Fragment shaders for the 3D spectral visualization
-// Inspired by: https://github.com/SuboptimalEng/three-js-games/tree/main/04-audio-visualizer
+// Adapted from: https://github.com/SuboptimalEng/three-js-games/tree/main/04-audio-visualizer
 
 // Vertex shader
 export const spectralVertexShader = `
@@ -21,15 +21,21 @@ export const spectralVertexShader = `
     // Sample the audio data from texture with improved frequency mapping
     float audioValue = texture2D(audioTexture, vec2(abs(position.x) / 4.0, 0.0)).r;
     
-    // Enhanced audio response
-    float elevation = audioValue * audioIntensity * 2.5;
+    // Calculate floor values for grid-based visualization (SuboptimalEng approach)
+    float floor_x = round(abs(position.x));
+    float floor_y = round(abs(position.y));
     
-    // Add more complex wave patterns for richer visualization
-    elevation += sin(position.x * 3.0 + time * 0.7) * 0.2 * audioIntensity;
-    elevation += cos(position.y * 2.5 + time * 0.4) * 0.15 * audioIntensity;
-    elevation += sin(position.x * 0.8 + position.y * 0.8 + time * 0.5) * 0.1 * audioIntensity;
+    // Calculate multipliers for dynamic range
+    float x_multiplier = (32.0 - abs(position.x)) / 8.0;
+    float y_multiplier = (32.0 - abs(position.y)) / 8.0;
     
-    // Add some ripple effects emanating from center
+    // Enhanced audio response with SuboptimalEng's sine wave approach
+    float elevation = sin(audioValue * 10.0) * audioIntensity * 2.5;
+    
+    // Add wave patterns inspired by SuboptimalEng
+    elevation += sin(audioValue * 10.0 + time * 0.5) * audioIntensity;
+    
+    // Add ripple effects emanating from center (our original effect)
     float dist = sqrt(position.x * position.x + position.y * position.y);
     elevation += sin(dist * 3.0 - time * 1.0) * 0.1 * audioIntensity;
     
@@ -65,28 +71,35 @@ export const spectralFragmentShader = `
     // Sample audio data for coloring
     float audioValue = texture2D(audioTexture, vec2(abs(x) / 4.0, 0.0)).r;
     
-    // Use HSL color space for more vivid and consistent colors
+    // Use SuboptimalEng's color mapping approach combined with our HSL approach
+    // Calculate position-based color (from SuboptimalEng)
+    vec3 positionColor = vec3(
+      (32.0 - abs(x)) / 32.0, 
+      (32.0 - abs(y)) / 32.0, 
+      (abs(x + y) / 2.0) / 32.0
+    );
+    
+    // Use HSL color space for more vibrant and audio-reactive colors (our approach)
     float hue = 0.6 + audioValue * 0.3 + sin(time * 0.1) * 0.1;  // Blue to purple range
     float saturation = 0.7 + audioValue * 0.3;                   // More saturated with higher audio
     float lightness = 0.3 + vElevation * 0.2 + audioValue * 0.1; // Brighter with elevation and audio
     
     // Convert HSL to RGB
-    vec3 finalColor = hsl2rgb(vec3(hue, saturation, lightness));
+    vec3 hslColor = hsl2rgb(vec3(hue, saturation, lightness));
     
-    // Add subtle glow effect
+    // Blend the two color approaches
+    vec3 finalColor = mix(positionColor, hslColor, 0.5 + audioValue * 0.5);
+    
+    // Add audio-reactive glow
     float glow = smoothstep(0.0, 0.5, audioValue) * audioIntensity;
     finalColor += vec3(0.1, 0.2, 0.5) * glow;
     
-    // Apply a subtle gradient based on position
-    finalColor *= 1.0 + 0.2 * sin(x * 0.1 + time * 0.2);
+    // Add time-based animation
+    finalColor += 0.05 * sin(time * 0.5 + vUv.x * 10.0);
     
-    // Add alpha with distance fade for a more ethereal look
+    // Adjust alpha for a more ethereal look
     float alpha = 0.7 + audioValue * 0.3;
     
-    // Add brightness variation based on height and audio
-    float brightness = z * 0.5 + 0.5;
-    brightness = brightness * (0.8 + audioValue * 0.4);
-    
-    gl_FragColor = vec4(finalColor * brightness, alpha);
+    gl_FragColor = vec4(finalColor, alpha);
   }
 `;

@@ -1,0 +1,232 @@
+import { useEffect, useRef, useState } from 'react';
+import { type AudioData } from '../../types/audio';
+
+interface SpectrogramProps {
+  audioData: AudioData;
+  height?: number;
+  width?: number;
+  colorMap?: string[];
+  showScale?: boolean;
+  externalAudio?: HTMLAudioElement;
+}
+
+export function Spectrogram({
+  audioData,
+  height = 200,
+  width = 800,
+  colorMap = [
+    'rgba(0, 0, 0, 1)',
+    'rgba(0, 0, 255, 1)',
+    'rgba(0, 255, 255, 1)',
+    'rgba(0, 255, 0, 1)',
+    'rgba(255, 255, 0, 1)',
+    'rgba(255, 0, 0, 1)'
+  ],
+  showScale = true,
+  externalAudio
+}: SpectrogramProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const xPosRef = useRef(0);
+
+  // Visualization function - modified to use isPlaying state
+  const draw = () => {
+    if (!analyserRef.current || !canvasRef.current || !isPlaying) {
+      return;
+    }
+    
+    animationRef.current = requestAnimationFrame(draw);
+    
+    const analyser = analyserRef.current;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(dataArray);
+    
+    const canvas = canvasRef.current;
+    const canvasCtx = canvas.getContext('2d');
+    if (!canvasCtx) return;
+    
+    // Draw current column
+    const imageData = canvasCtx.createImageData(1, height);
+    
+    for (let i = 0; i < height; i++) {
+      // Map canvas y coordinate to frequency bin
+      const binIndex = Math.floor(i / height * bufferLength);
+      const value = dataArray[binIndex] / 255.0;
+      
+      // Get color for the value
+      const color = getColor(value);
+      
+      // Parse the color
+      const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)/);
+      if (!match) continue;
+      
+      const r = parseInt(match[1], 10);
+      const g = parseInt(match[2], 10);
+      const b = parseInt(match[3], 10);
+      const a = match[4] ? parseFloat(match[4]) * 255 : 255;
+      
+      // Set pixel color
+      const pixelIndex = (height - i - 1) * 4;
+      imageData.data[pixelIndex] = r;
+      imageData.data[pixelIndex + 1] = g;
+      imageData.data[pixelIndex + 2] = b;
+      imageData.data[pixelIndex + 3] = a;
+    }
+    
+    // Put image data
+    canvasCtx.putImageData(imageData, xPosRef.current, 0);
+    
+    // Increment x position
+    xPosRef.current = (xPosRef.current + 1) % width;
+    
+    // Draw vertical line at current position
+    canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    canvasCtx.fillRect(xPosRef.current, 0, 1, height);
+    
+    // Draw frequency scale
+    if (showScale) {
+      // Save context
+      canvasCtx.save();
+      
+      // Draw over right edge with black box
+      canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      canvasCtx.fillRect(width - 60, 0, 60, height);
+      
+      // Draw frequency labels
+      canvasCtx.fillStyle = 'white';
+      canvasCtx.font = '10px Arial';
+      canvasCtx.textAlign = 'left';
+      
+      const labelCount = 10;
+      const step = Math.floor(audioContextRef.current!.sampleRate / 2 / labelCount);
+      
+      for (let i = 0; i <= labelCount; i++) {
+        const freq = Math.floor(i * step);
+        const y = height - (i / labelCount) * height;
+        
+        canvasCtx.fillText(
+          freq >= 1000 ? `${(freq / 1000).toFixed(1)}kHz` : `${freq}Hz`,
+          width - 55,
+          y + 3
+        );
+      }
+      
+      // Restore context
+      canvasCtx.restore();
+    }
+  };
+    
+    // Draw spectrogram
+    const draw = () => {
+      animationRef.current = requestAnimationFrame(draw);
+      
+      analyser.getByteFrequencyData(dataArray);
+      
+      // Draw current column
+      const imageData = canvasCtx.createImageData(1, height);
+      
+      for (let i = 0; i < height; i++) {
+        // Map canvas y coordinate to frequency bin
+        const binIndex = Math.floor(i / height * bufferLength);
+        const value = dataArray[binIndex] / 255.0;
+        
+        // Get color for the value
+        const color = getColor(value);
+        
+        // Parse the color
+        const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)/);
+        if (!match) continue;
+        
+        const r = parseInt(match[1], 10);
+        const g = parseInt(match[2], 10);
+        const b = parseInt(match[3], 10);
+        const a = match[4] ? parseFloat(match[4]) * 255 : 255;
+        
+        // Set pixel color
+        const pixelIndex = (height - i - 1) * 4;
+        imageData.data[pixelIndex] = r;
+        imageData.data[pixelIndex + 1] = g;
+        imageData.data[pixelIndex + 2] = b;
+        imageData.data[pixelIndex + 3] = a;
+      }
+      
+      // Put image data
+      canvasCtx.putImageData(imageData, xPos, 0);
+      
+      // Increment x position
+      xPos = (xPos + 1) % width;
+      
+      // Draw vertical line at current position
+      canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      canvasCtx.fillRect(xPos, 0, 1, height);
+      
+      // Draw frequency scale
+      if (showScale) {
+        // Save context
+        canvasCtx.save();
+        
+        // Draw over right edge with black box
+        canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        canvasCtx.fillRect(width - 60, 0, 60, height);
+        
+        // Draw frequency labels
+        canvasCtx.fillStyle = 'white';
+        canvasCtx.font = '10px Arial';
+        canvasCtx.textAlign = 'left';
+        
+        const labelCount = 10;
+        const step = Math.floor(audioContext.sampleRate / 2 / labelCount);
+        
+        for (let i = 0; i <= labelCount; i++) {
+          const freq = Math.floor(i * step);
+          const y = height - (i / labelCount) * height;
+          
+          canvasCtx.fillText(
+            freq >= 1000 ? `${(freq / 1000).toFixed(1)}kHz` : `${freq}Hz`,
+            width - 55,
+            y + 3
+          );
+        }
+        
+        // Restore context
+        canvasCtx.restore();
+      }
+    };
+    
+    // Start visualization
+    draw();
+    
+    // Cleanup
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      
+      if (sourceRef.current) {
+        sourceRef.current.stop();
+      }
+      
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+      
+      // Remove event listeners if using external audio
+      if (externalAudio) {
+        externalAudio.removeEventListener('play', () => setIsPlaying(true));
+        externalAudio.removeEventListener('pause', () => setIsPlaying(false));
+        externalAudio.removeEventListener('ended', () => setIsPlaying(false));
+      }
+    };
+  }, [audioData, height, width, colorMap, showScale, externalAudio]);
+  
+  return (
+    <div className="spectrogram">
+      <canvas ref={canvasRef} className="w-full h-full"></canvas>
+    </div>
+  );
+}

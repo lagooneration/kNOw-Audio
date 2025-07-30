@@ -254,7 +254,16 @@
 .three-container {
   width: 100%;
   height: 100%;
-  min-height: 400px;
+  min-height: 270px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.spectral-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: #030712;
   border-radius: 8px;
   overflow: hidden;
 }

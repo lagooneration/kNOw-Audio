@@ -13,13 +13,13 @@ export function SpectralAnalysis({ audioData }: SpectralAnalysisProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [analyzer, setAnalyzer] = useState<Tone.Analyser | null>(null);
   const playerRef = useRef<Tone.Player | null>(null);
-
-  // Effects state (defaults)
+  
+  // Effects state for visualization enhancements
   const [effects, setEffects] = useState({
     reverb: false,
     delay: false,
     distortion: false,
-    filter: false
+    filter: true
   });
 
   // Set up Tone.js audio processor and analyzer
@@ -68,6 +68,14 @@ export function SpectralAnalysis({ audioData }: SpectralAnalysisProps) {
     setIsPlaying(!isPlaying);
   };
 
+  // Toggle effect function for visualization enhancements
+  const toggleEffect = (effect: keyof typeof effects) => {
+    setEffects(prev => ({
+      ...prev,
+      [effect]: !prev[effect]
+    }));
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -91,8 +99,38 @@ export function SpectralAnalysis({ audioData }: SpectralAnalysisProps) {
             effects={effects}
           />
         </div>
+        <div className="flex gap-2 mt-3">
+          <Button 
+            size="sm" 
+            variant={effects.filter ? "default" : "outline"}
+            onClick={() => toggleEffect('filter')}
+          >
+            Filter
+          </Button>
+          <Button 
+            size="sm" 
+            variant={effects.reverb ? "default" : "outline"}
+            onClick={() => toggleEffect('reverb')}
+          >
+            Reverb
+          </Button>
+          <Button 
+            size="sm" 
+            variant={effects.delay ? "default" : "outline"}
+            onClick={() => toggleEffect('delay')}
+          >
+            Delay
+          </Button>
+          <Button 
+            size="sm" 
+            variant={effects.distortion ? "default" : "outline"}
+            onClick={() => toggleEffect('distortion')}
+          >
+            Distortion
+          </Button>
+        </div>
         <p className="text-xs text-muted-foreground mt-2">
-          3D visualization of frequency content. Click and drag to rotate the view. Scroll to zoom.
+          3D visualization of frequency content. Click and drag to rotate the view. Scroll to zoom. Toggle effects to enhance visualization.
         </p>
       </CardContent>
     </Card>

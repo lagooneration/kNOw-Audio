@@ -20,7 +20,7 @@ export function SpectralAudioVisualizer({ analyzer, isPlaying, effects }: Spectr
   // Component to create the visualization
   return (
     <div className="w-full h-full bg-black/40 backdrop-blur-sm rounded-md overflow-hidden">
-      <Canvas camera={{ position: [0, 3, 5], fov: 60 }}>
+      <Canvas camera={{ position: [0, 15, 30], fov: 60 }}>
         <SpectralVisualization analyzer={analyzer} isPlaying={isPlaying} effects={effects} />
         <OrbitControls enableZoom={true} enablePan={true} />
       </Canvas>
@@ -109,11 +109,11 @@ function SpectralVisualization({ analyzer, isPlaying, effects }: SpectralVisuali
       const dataSize = Math.min(audioData.length, textureData.length / 4);
       
       for (let i = 0; i < dataSize; i++) {
-        // Enhance the audio response by boosting the values
+        // SuboptimalEng approach for normalizing audio data
         let value = (audioData[i] + 140) / 140; // Normalize from dB to 0-1
         
-        // Apply some enhancement for better visual effect
-        value = Math.pow(value, 1.5); // Apply curve to enhance mid-high values
+        // Enhance mid-high frequencies for more dramatic visualization
+        value = Math.pow(value, 1.5);
         
         // Add some noise for more organic look when paused
         if (!isPlaying) {
@@ -138,13 +138,36 @@ function SpectralVisualization({ analyzer, isPlaying, effects }: SpectralVisuali
       if (effects.filter) intensity += 0.15;
       
       materialRef.current.uniforms.audioIntensity.value = intensity;
-    }
-    
-    // Rotate plane slightly for more dynamic appearance
-    if (planeRef.current) {
-      planeRef.current.rotation.z = Math.sin(time * 0.1) * 0.02;
+      
+      // Animate the plane for more dynamic appearance
+      if (planeRef.current) {
+        // SuboptimalEng-inspired rotation
+        planeRef.current.rotation.z = Math.sin(time * 0.1) * 0.05;
+      }
     }
   });
+
+  // Dynamically update the wireframe color based on effects
+  useEffect(() => {
+    if (!materialRef.current) return;
+    
+    // Update material color based on effects
+    const color = new THREE.Color(0.2, 0.4, 0.8);
+    
+    // Modify color based on effects
+    if (effects.reverb) color.r += 0.1;
+    if (effects.delay) color.g += 0.1;
+    if (effects.distortion) {
+      color.r += 0.2;
+      color.g -= 0.1;
+    }
+    if (effects.filter) color.b += 0.1;
+    
+    // Apply color to the material
+    materialRef.current.wireframe = true;
+    materialRef.current.wireframeLinewidth = 1;
+    
+  }, [effects]);
   
   return (
     <>
@@ -152,19 +175,21 @@ function SpectralVisualization({ analyzer, isPlaying, effects }: SpectralVisuali
       <pointLight position={[10, 10, 10]} intensity={0.8} />
       <pointLight position={[-10, -10, -10]} intensity={0.5} />
       
-      {/* Spectral Mountain Visualization */}
+      {/* Spectral Mountain Visualization - Using SuboptimalEng approach */}
       <mesh 
         ref={planeRef}
-        position={[0, -1.5, 0]} 
-        rotation={[-Math.PI / 3, 0, 0]}
+        position={[0, 0, 0]} 
+        rotation={[-Math.PI / 2 + Math.PI / 4, 0, 0]}
+        scale={[2, 2, 2]}
       >
-        <planeGeometry args={[8, 6, 196, 96]} />
+        <planeGeometry args={[32, 32, 64, 64]} />
         <shaderMaterial 
           ref={materialRef}
           vertexShader={spectralVertexShader}
           fragmentShader={spectralFragmentShader}
           side={THREE.DoubleSide}
           transparent={true}
+          wireframe={true}
           uniforms={{
             time: { value: 0 },
             audioIntensity: { value: 0.5 },
@@ -174,7 +199,7 @@ function SpectralVisualization({ analyzer, isPlaying, effects }: SpectralVisuali
       </mesh>
       
       {/* Grid for reference */}
-      <gridHelper ref={gridRef} args={[20, 40, 0x444444, 0x222222]} position={[0, -2, 0]} />
+      <gridHelper ref={gridRef} args={[40, 40, 0x444444, 0x222222]} position={[0, -10, 0]} />
     </>
   );
 }
