@@ -84,14 +84,19 @@ export function HomePage() {
   }, [audioData]);
 
   const handleVisualizationChange = (newVisualization: 'frequency' | 'spectrogram' | '3d') => {
-    // Set the new visualization
-    setActiveVisualization(newVisualization);
-    
-    // If audio is currently playing, continue playing with the new visualization
-    // Otherwise, keep it paused
-    if (audioRef.current && isPlaying) {
-      // Ensure audio continues playing
-      audioRef.current.play().catch(err => console.error('Error playing audio:', err));
+    // Only set the new visualization if audio data exists and is ready
+    if (audioData?.buffer) {
+      // Set the new visualization
+      setActiveVisualization(newVisualization);
+      
+      // If audio is currently playing, continue playing with the new visualization
+      // Otherwise, keep it paused
+      if (audioRef.current && isPlaying) {
+        // Ensure audio continues playing
+        audioRef.current.play().catch(err => console.error('Error playing audio:', err));
+      }
+    } else {
+      console.warn('Cannot change visualization: Audio data not fully loaded');
     }
   };
 
@@ -124,8 +129,15 @@ export function HomePage() {
               glowColor="132, 0, 255"
               onCardClick={(index) => {
                 if (index === 0) {
-                  // Already on the analyzer page, just scroll to content
-                  window.scrollTo({ top: 500, behavior: "smooth" });
+                  // Analysis card clicked
+                  if (!audioData) {
+                    // If no audio data, scroll to file upload
+                    window.scrollTo({ top: 500, behavior: "smooth" });
+                  } else {
+                    // If audio data exists, show frequency visualization as default
+                    setActiveVisualization('frequency');
+                    window.scrollTo({ top: 500, behavior: "smooth" });
+                  }
                 } else if (index === 1) {
                   navigate('/mixing');
                 } else if (index === 2) {
@@ -185,33 +197,41 @@ export function HomePage() {
                 />
               </CardHeader>
               <CardContent className="h-96 relative">
-                {activeVisualization === 'frequency' && (
-                  <FrequencySpectrum 
-                    audioData={audioData} 
-                    height={300} 
-                    width={800}
-                    externalAudio={audioRef.current || undefined}
-                    sharedAnalyser={analyserRef.current}
-                  />
-                )}
-                
-                {activeVisualization === 'spectrogram' && (
-                  <Spectrogram 
-                    audioData={audioData} 
-                    height={300} 
-                    width={800}
-                    externalAudio={audioRef.current || undefined}
-                    sharedAnalyser={analyserRef.current}
-                  />
-                )}
-                
-                {activeVisualization === '3d' && (
-                  <AudioVisualizer 
-                    audioData={audioData} 
-                    mode="spectral"
-                    externalAudio={audioRef.current || undefined}
-                    sharedAnalyser={analyserRef.current}
-                  />
+                {audioData?.buffer ? (
+                  <>
+                    {activeVisualization === 'frequency' && (
+                      <FrequencySpectrum 
+                        audioData={audioData} 
+                        height={300} 
+                        width={800}
+                        externalAudio={audioRef.current || undefined}
+                        sharedAnalyser={analyserRef.current}
+                      />
+                    )}
+                    
+                    {activeVisualization === 'spectrogram' && (
+                      <Spectrogram 
+                        audioData={audioData} 
+                        height={300} 
+                        width={800}
+                        externalAudio={audioRef.current || undefined}
+                        sharedAnalyser={analyserRef.current}
+                      />
+                    )}
+                    
+                    {activeVisualization === '3d' && (
+                      <AudioVisualizer 
+                        audioData={audioData} 
+                        mode="spectral"
+                        externalAudio={audioRef.current || undefined}
+                        sharedAnalyser={analyserRef.current}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-gray-400">Audio data is still loading or not available...</p>
+                  </div>
                 )}
               </CardContent>
             </Card>

@@ -63,7 +63,20 @@ const cardData: BentoCardProps[] = [
     image: "/images/chord-gen.jpg",
     backgroundImage: true
   },
-  
+  {
+    color: "#060010",
+    title: "",
+    description: "coming soon",
+    label: "Lyrics Generator",
+    image: "/images/lyrics.svg"
+  },
+  {
+    color: "#060010",
+    title: "",
+    description: "coming soon",
+    label: "Beats",
+    image: "/images/beats.svg"
+  },
 ];
 
 const createParticleElement = (

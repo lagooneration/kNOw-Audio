@@ -64,7 +64,7 @@ export function Spectrogram({
         } catch (err) {
           console.warn('Audio element already connected, cannot create new MediaElementSource');
         }
-      } else {
+      } else if (audioData?.buffer) {
         // Create source from the audio buffer
         const source = audioContext.createBufferSource();
         source.buffer = audioData.buffer;
@@ -77,6 +77,8 @@ export function Spectrogram({
         
         // Save reference
         sourceRef.current = source;
+      } else {
+        console.warn('No valid audio buffer available');
       }
       
       // Save references
@@ -118,7 +120,8 @@ export function Spectrogram({
       canvasCtx.font = '10px Arial';
       canvasCtx.textAlign = 'right';
       
-      const nyquist = audioData.buffer.sampleRate / 2;
+      // Check if buffer exists before accessing sampleRate
+      const nyquist = audioData?.buffer?.sampleRate ? audioData.buffer.sampleRate / 2 : 22050; // Default to 44.1kHz/2
       const labelCount = 5;
       
       for (let i = 0; i <= labelCount; i++) {
@@ -166,7 +169,7 @@ export function Spectrogram({
     if (!isPlaying || !analyserRef.current || !canvasRef.current) return;
     
     // If using internal source and not using external audio, start it when play button is clicked
-    if (!externalAudio && sourceRef.current && audioContextRef.current) {
+    if (!externalAudio && sourceRef.current && audioContextRef.current && audioData?.buffer) {
       try {
         // Create a new source node
         const newSource = audioContextRef.current.createBufferSource();
@@ -291,7 +294,9 @@ export function Spectrogram({
         canvasCtx.textAlign = 'left';
         
         const labelCount = 10;
-        const step = Math.floor(audioContextRef.current!.sampleRate / 2 / labelCount);
+        // Safely access the sample rate with a fallback value
+        const sampleRate = audioContextRef.current?.sampleRate || 44100; // Default to 44.1kHz
+        const step = Math.floor(sampleRate / 2 / labelCount);
         
         for (let i = 0; i <= labelCount; i++) {
           const freq = Math.floor(i * step);
