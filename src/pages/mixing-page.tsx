@@ -7,11 +7,15 @@ import { FileUpload } from '../components/audio/file-upload';
 import { FrequencyOverlapVisualizer } from '../components/audio/frequency-overlap';
 import { EQSuggestionsDisplay } from '../components/audio/eq-suggestions';
 import { FrequencySpectrum } from '../components/audio/frequency-spectrum';
+import { FrequencyInterferenceExplanation } from '../components/audio/frequency-interference-explanation';
+import { CombinedAudioVisualizer } from '../components/audio/combined-audio-visualizer';
 import { useAudioMixing } from '../hooks/use-audio-mixing';
 import { analyzeFrequencyOverlap, generateEQSuggestions } from '../utils/audio-mixing';
 import type { FrequencyOverlap, EQSuggestion } from '../utils/audio-mixing';
 import DarkVeil from '../components/ui/DarkVeil';
 import MagicBento from '../components/ui/MagicBento';
+import Search from '../components/ui/Search';
+import MetaBalls from '../components/ui/MetaBalls';
 
 export function MixingPage() {
   const { mixingState, processTrack, clearTrack } = useAudioMixing();
@@ -86,10 +90,15 @@ export function MixingPage() {
       <Container className="relative z-10">
         <div className="max-w-6xl mx-auto space-y-8 py-8">
           <div className='text-center mb-8'>
-            <h1 className="text-3xl text-white/70 font-bold mb-4">Audio Mixer</h1>
-            <p className="text-muted-foreground mb-8">
-              Upload two audio tracks to analyze frequency overlaps and get EQ suggestions for better mixing.
-            </p>
+            <h1 className="text-4xl font-bold text-white mb-4 font-goldman tracking-wider relative z-10">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-blue-500 to-purple-600">
+                Know Audio
+              </span>
+              <div className="absolute inset-0 blur-sm opacity-50 bg-gradient-to-r from-purple-400 via-blue-500 to-purple-600 bg-clip-text text-transparent -z-10">
+                Know Audio
+              </div>
+            </h1>
+            <Search />
           </div>
 
           <div className="mb-8 min-h-[400px] flex items-center">
@@ -116,6 +125,15 @@ export function MixingPage() {
               }}
             />
           </div>
+          </div>
+
+          <div className="text-center h-4"> 
+          </div>
+          <div className='text-center mb-8'>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bitcount text-white/80 font-bold mb-4">Audio Mixer</h1>
+            <p className="text-foreground text-white/80 font-goldman mb-8">
+              Upload two audio tracks to analyze frequency overlaps and get EQ suggestions for better mixing.
+            </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -269,21 +287,51 @@ export function MixingPage() {
               </Card>
               
               {!analyzing && (
-                <EQSuggestionsDisplay 
-                  suggestions={suggestions}
-                  track1Name={mixingState.track1.metadata.name}
-                  track2Name={mixingState.track2.metadata.name}
-                />
+                <>
+                  <FrequencyInterferenceExplanation overlaps={overlaps} />
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Frequency Band Interference Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        This visualization shows both audio tracks in the time domain and how they combine together.
+                        Areas with potential interference are highlighted across broader frequency bands.
+                      </p>
+                      <CombinedAudioVisualizer
+                        track1={mixingState.track1}
+                        track2={mixingState.track2}
+                        overlaps={overlaps}
+                        suggestions={suggestions}
+                        height={300}
+                        width={800}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <EQSuggestionsDisplay 
+                    suggestions={suggestions}
+                    track1Name={mixingState.track1.metadata.name}
+                    track2Name={mixingState.track2.metadata.name}
+                  />
+                </>
               )}
             </div>
           ) : (
             <Card className="bg-blue-900/20 border border-dashed border-muted">
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <div className="text-4xl text-muted-foreground mb-4">🎛️ + 🎚️</div>
+                <div className="relative w-full h-64">
+                  <MetaBalls 
+                    color="#4B56D2"
+                    speed={0.8}
+                    enableMouseInteraction={true}
+                    ballCount={15}
+                    clumpFactor={0.6}
+                    enableTransparency={true}
+                  />
+                </div>
                 <h3 className="text-xl text-white/70 font-medium mb-2">Ready to Mix</h3>
-                <p className="text-muted-foreground text-center max-w-md">
-                  Upload two audio tracks to see where their frequencies overlap and get suggestions for better mixing.
-                </p>
               </CardContent>
             </Card>
           )}

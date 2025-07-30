@@ -9,35 +9,47 @@ export const spectralVertexShader = `
   varying vec3 vUv;
   varying float vElevation;
 
+  // Support both naming conventions for backward compatibility
   uniform float time;
+  uniform float u_time;
   uniform float audioIntensity;
+  uniform float u_amplitude;
   uniform sampler2D audioTexture;
+  uniform float u_audio_data[64];
 
   void main() {
     vUv = position;
     x = position.x;
     y = position.y;
     
-    // Sample the audio data from texture with improved frequency mapping
-    float audioValue = texture2D(audioTexture, vec2(abs(position.x) / 4.0, 0.0)).r;
+    // Use either time variable that's available
+    float t = time > 0.0 ? time : u_time;
     
-    // Calculate floor values for grid-based visualization (SuboptimalEng approach)
-    float floor_x = round(abs(position.x));
-    float floor_y = round(abs(position.y));
+    // Use either amplitude variable that's available
+    float amplitude = audioIntensity > 0.0 ? audioIntensity : u_amplitude;
     
-    // Calculate multipliers for dynamic range
-    float x_multiplier = (32.0 - abs(position.x)) / 8.0;
-    float y_multiplier = (32.0 - abs(position.y)) / 8.0;
+    // Get normalized position for sampling
+    float sampleX = abs(position.x) / 10.0;
     
-    // Enhanced audio response with SuboptimalEng's sine wave approach
-    float elevation = sin(audioValue * 10.0) * audioIntensity * 2.5;
+    // Try to sample from texture first
+    float audioValue;
+    if (sampleX <= 1.0) {
+      audioValue = texture2D(audioTexture, vec2(sampleX, 0.0)).r;
+    } else {
+      // Fallback to array if texture sampling gives zero
+      int index = int(min(abs(position.x * 3.0), 63.0));
+      audioValue = u_audio_data[index];
+    }
     
-    // Add wave patterns inspired by SuboptimalEng
-    elevation += sin(audioValue * 10.0 + time * 0.5) * audioIntensity;
+    // Calculate elevation
+    float elevation = sin(audioValue * 10.0) * amplitude * 2.5;
     
-    // Add ripple effects emanating from center (our original effect)
+    // Add wave patterns
+    elevation += sin(audioValue * 10.0 + t * 0.5) * amplitude;
+    
+    // Add ripple effects emanating from center
     float dist = sqrt(position.x * position.x + position.y * position.y);
-    elevation += sin(dist * 3.0 - time * 1.0) * 0.1 * audioIntensity;
+    elevation += sin(dist * 3.0 - t * 1.0) * 0.1 * amplitude;
     
     // Store elevation for fragment shader coloring
     vElevation = elevation;
@@ -57,9 +69,13 @@ export const spectralFragmentShader = `
   varying vec3 vUv;
   varying float vElevation;
 
+  // Support both naming conventions for backward compatibility
   uniform float time;
+  uniform float u_time;
   uniform float audioIntensity;
+  uniform float u_amplitude;
   uniform sampler2D audioTexture;
+  uniform float u_audio_data[64];
 
   // HSL to RGB conversion function for more vibrant colors
   vec3 hsl2rgb(vec3 c) {
@@ -68,34 +84,44 @@ export const spectralFragmentShader = `
   }
 
   void main() {
-    // Sample audio data for coloring
-    float audioValue = texture2D(audioTexture, vec2(abs(x) / 4.0, 0.0)).r;
+    // Use either time variable that's available
+    float t = time > 0.0 ? time : u_time;
     
-    // Use SuboptimalEng's color mapping approach combined with our HSL approach
-    // Calculate position-based color (from SuboptimalEng)
-    vec3 positionColor = vec3(
-      (32.0 - abs(x)) / 32.0, 
-      (32.0 - abs(y)) / 32.0, 
-      (abs(x + y) / 2.0) / 32.0
-    );
+    // Use either amplitude variable that's available
+    float amplitude = audioIntensity > 0.0 ? audioIntensity : u_amplitude;
     
-    // Use HSL color space for more vibrant and audio-reactive colors (our approach)
-    float hue = 0.6 + audioValue * 0.3 + sin(time * 0.1) * 0.1;  // Blue to purple range
-    float saturation = 0.7 + audioValue * 0.3;                   // More saturated with higher audio
+    // Get normalized position for sampling
+    float sampleX = abs(x) / 10.0;
+    
+    // Try to sample from texture first
+    float audioValue;
+    if (sampleX <= 1.0) {
+      audioValue = texture2D(audioTexture, vec2(sampleX, 0.0)).r;
+    } else {
+      // Fallback to array if texture sampling gives zero
+      int index = int(min(abs(x * 3.0), 63.0));
+      audioValue = u_audio_data[index];
+    }
+    
+    // Ensure we have a valid audio value
+    if (audioValue < 0.01) {
+      audioValue = 0.01;
+    }
+    
+    // Use HSL color space for more vibrant and audio-reactive colors
+    float hue = 0.6 + audioValue * 0.3 + sin(t * 0.1) * 0.1;  // Blue to purple range
+    float saturation = 0.7 + audioValue * 0.3;                // More saturated with higher audio
     float lightness = 0.3 + vElevation * 0.2 + audioValue * 0.1; // Brighter with elevation and audio
     
     // Convert HSL to RGB
     vec3 hslColor = hsl2rgb(vec3(hue, saturation, lightness));
     
-    // Blend the two color approaches
-    vec3 finalColor = mix(positionColor, hslColor, 0.5 + audioValue * 0.5);
-    
     // Add audio-reactive glow
-    float glow = smoothstep(0.0, 0.5, audioValue) * audioIntensity;
-    finalColor += vec3(0.1, 0.2, 0.5) * glow;
+    float glow = smoothstep(0.0, 0.5, audioValue) * amplitude;
+    vec3 finalColor = hslColor + vec3(0.1, 0.2, 0.5) * glow;
     
     // Add time-based animation
-    finalColor += 0.05 * sin(time * 0.5 + vUv.x * 10.0);
+    finalColor += 0.05 * sin(t * 0.5 + vUv.x * 10.0);
     
     // Adjust alpha for a more ethereal look
     float alpha = 0.7 + audioValue * 0.3;

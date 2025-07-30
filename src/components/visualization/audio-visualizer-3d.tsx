@@ -18,19 +18,20 @@ export function AudioVisualizer({
   audioData,
   mode = '3d',
   color = '#4a88ff',
-  backgroundColor = '#000000',
+  backgroundColor = '#060010', // Matching the app theme
   externalAudio,
   sharedAnalyser
 }: AudioVisualizerProps) {
   return (
-    <div className="three-container">
+    <div className="three-container w-full h-full rounded-md overflow-hidden">
       <Canvas
-        camera={{ position: [0, 0, 15], fov: 60 }}
-        gl={{ antialias: true }}
+        camera={{ position: [0, 2, 15], fov: 60 }}
+        gl={{ antialias: true, alpha: true }}
         style={{ background: backgroundColor }}
       >
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={1} />
+        <pointLight position={[-10, -10, -10]} intensity={0.5} color="#8800ff" />
         <AudioVisualization 
           audioData={audioData} 
           mode={mode} 
@@ -129,9 +130,9 @@ function AudioVisualization({ audioData, mode, color, externalAudio, sharedAnaly
             }
           };
         } catch (err) {
-          console.warn('Audio element already connected, cannot create new MediaElementSource');
+          console.warn('Audio element already connected, cannot create new MediaElementSource:', err instanceof Error ? err.message : 'Unknown error');
         }
-      } else {
+      } else if (audioData?.buffer) {
         // Create source from buffer
         const source = audioContext.createBufferSource();
         source.buffer = audioData.buffer;
@@ -144,6 +145,8 @@ function AudioVisualization({ audioData, mode, color, externalAudio, sharedAnaly
         
         // Save source reference
         audioSourceRef.current = source;
+      } else {
+        console.warn('No valid audio buffer available for 3D visualization');
       }
       
       // Save references
@@ -185,20 +188,34 @@ function AudioVisualization({ audioData, mode, color, externalAudio, sharedAnaly
     
     if (mode === 'spectral') {
       // Create a spectral plane with shader material
-      const planeGeometry = new THREE.PlaneGeometry(20, 20, 64, 64);
+      const planeGeometry = new THREE.PlaneGeometry(20, 20, 128, 128); // Higher resolution for better detail
+      
+      // Create audio data texture
+      const audioTextureData = new Uint8Array(64 * 4); // RGBA format
+      const audioTexture = new THREE.DataTexture(
+        audioTextureData,
+        64,
+        1,
+        THREE.RGBAFormat
+      );
+      audioTexture.needsUpdate = true;
       
       const uniforms = {
-        u_time: { value: 0.0 },
-        u_amplitude: { value: 3.0 },
-        u_audio_data: { value: Array(64).fill(0) },
+        time: { value: 0.0 },
+        audioIntensity: { value: 3.0 },
+        audioTexture: { value: audioTexture },
+        u_time: { value: 0.0 },               // For backward compatibility
+        u_amplitude: { value: 3.0 },          // For backward compatibility
+        u_audio_data: { value: Array(64).fill(0) }  // For backward compatibility
       };
       
       const planeMaterial = new THREE.ShaderMaterial({
         uniforms: uniforms,
         vertexShader: spectralVertexShader,
         fragmentShader: spectralFragmentShader,
-        wireframe: true,
+        wireframe: false,  // Change to solid rendering for better visuals
         transparent: true,
+        side: THREE.DoubleSide,  // Make it visible from both sides
       });
       
       const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
@@ -250,7 +267,7 @@ function AudioVisualization({ audioData, mode, color, externalAudio, sharedAnaly
     if (!analyzerRef.current || !dataArrayRef.current || !isPlaying) return;
     
     // If using internal source and not using external audio, start it when play button is clicked
-    if (!externalAudio && audioSourceRef.current && audioContextRef.current && isPlaying) {
+    if (!externalAudio && audioSourceRef.current && audioContextRef.current && isPlaying && audioData?.buffer) {
       try {
         // Start the audio source if it's not already started
         if (audioContextRef.current.state !== 'running') {
@@ -278,10 +295,30 @@ function AudioVisualization({ audioData, mode, color, externalAudio, sharedAnaly
       
       scene.children.forEach(child => {
         if (child instanceof THREE.Mesh && child.material instanceof THREE.ShaderMaterial) {
-          // Update shader uniforms
+          // Update time uniform (for both naming conventions)
+          child.material.uniforms.time.value += 0.1;
           child.material.uniforms.u_time.value += 0.1;
           
-          // Map audio data to shader array
+          // Update audio texture
+          if (child.material.uniforms.audioTexture?.value instanceof THREE.DataTexture) {
+            const audioTexture = child.material.uniforms.audioTexture.value;
+            const audioTextureData = audioTexture.image.data;
+            
+            // Update texture data with audio frequencies
+            for (let i = 0; i < 64; i++) {
+              const value = dataArray[i] / 255.0;
+              // Cast to Uint8Array to avoid TypeScript errors
+              const textureData = audioTextureData as Uint8Array;
+              textureData[i * 4] = Math.floor(value * 255);     // R
+              textureData[i * 4 + 1] = Math.floor(value * 255); // G
+              textureData[i * 4 + 2] = Math.floor(value * 255); // B
+              textureData[i * 4 + 3] = 255;                     // A
+            }
+            
+            audioTexture.needsUpdate = true;
+          }
+          
+          // Map audio data to legacy shader array for backward compatibility
           const audioDataArray = Array.from(dataArray.slice(0, 64)).map(v => v / 255.0);
           child.material.uniforms.u_audio_data.value = audioDataArray;
           

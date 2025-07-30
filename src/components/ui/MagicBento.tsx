@@ -36,30 +36,30 @@ const cardData: BentoCardProps[] = [
   {
     color: "#060010",
     title: "",
-    description: "Visualize features",
+    description: "Visualize audio",
     label: "Analysis",
-    image: "/images/editing.svg"
+    image: "/images/info.svg"
   },
   {
     color: "#060010",
     title: "",
-    description: "Smart EQ assist",
+    description: "Understand EQ",
     label: "Mixing",
     image: "/images/mixing.svg"
   },
   {
     color: "#060010",
     title: "",
-    description: "Edit audio with an immersive 3D interface",
-    label: "Editor",
+    description: "Edit audio with spatial audio interface",
+    label: "Editing",
     image: "/images/3d-audio.jpg",
     backgroundImage: true
   },
   {
     color: "#060010",
     title: "",
-    description: "Generate chords for your music compositions",
-    label: "Chord Generator",
+    description: "Understand how chords work for your music compositions",
+    label: "Chords ",
     image: "/images/chord-gen.jpg",
     backgroundImage: true
   },
@@ -67,7 +67,7 @@ const cardData: BentoCardProps[] = [
     color: "#060010",
     title: "",
     description: "coming soon",
-    label: "Lyrics Generator",
+    label: "Lyrics",
     image: "/images/lyrics.svg"
   },
   {
@@ -589,8 +589,101 @@ const MagicBento: React.FC<BentoProps> = ({
 
   return (
     <>
+      <style>{`
+        .bento-grid {
+          --grid-gap: 1rem;
+          --card-min-height: 120px;
+          --transition-duration: 0.3s;
+        }
+        
+        .card {
+          transition: transform var(--transition-duration) cubic-bezier(0.34, 1.56, 0.64, 1), 
+                      box-shadow var(--transition-duration) ease;
+        }
+        
+        .card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+        
+        .card__label {
+          position: relative;
+          transition: color 0.3s ease;
+        }
+        
+        .card__label::after {
+          content: '';
+          position: absolute;
+          bottom: -4px;
+          left: 0;
+          width: 0;
+          height: 2px;
+          background: linear-gradient(90deg, #7c3aed, #3b82f6);
+          transition: width 0.3s ease;
+        }
+        
+        .card:hover .card__label::after {
+          width: 100%;
+        }
+        
+        .card__description {
+          transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .card:hover .card__description {
+          opacity: 1;
+          transform: translateY(-2px);
+          color: #61aef5;
+        }
+        
+        .text-clamp-1 {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        
+        .text-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
       <style>
         {`
+          @font-face {
+            font-family: 'Goldman';
+            src: url('/fonts/Goldman-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+          }
+          
+          @font-face {
+            font-family: 'Goldman';
+            src: url('/fonts/Goldman-Bold.ttf') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+            font-display: swap;
+          }
+          
+          @font-face {
+            font-family: 'Bitcount';
+            src: url('/fonts/Bitcount-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+          }
+          
+          @font-face {
+            font-family: 'Bitcount';
+            src: url('/fonts/Bitcount-Bold.ttf') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+            font-display: swap;
+          }
+          
           .bento-section {
             --glow-x: 50%;
             --glow-y: 50%;
@@ -700,6 +793,32 @@ const MagicBento: React.FC<BentoProps> = ({
             text-overflow: ellipsis;
           }
           
+          .card__label {
+            font-family: 'Bitcount', monospace;
+            font-weight: bold;
+            color: #a476eaff;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 10px rgba(132, 0, 255, 0.3);
+            letter-spacing: 0.02em;
+            scale: 1.4;
+            transition: text-shadow 0.3s ease;
+          }
+          
+          .card__description {
+            font-family: 'Goldman', sans-serif;
+            color: #bababaff;
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+          }
+          
+          .card:hover .card__label {
+            color: #c59fffff;
+            text-shadow: 0 3px 6px rgba(0, 0, 0, 0.7), 0 0 12px rgba(132, 0, 255, 0.4);
+          }
+          
+          .card:hover .card__description {
+            color: #f6f6f6ff;
+            text-shadow: 0 0 8px rgba(139, 233, 253, 0.3);
+          }
+          
           @media (max-width: 599px) {
             .card-responsive {
               grid-template-columns: 1fr;
@@ -727,7 +846,7 @@ const MagicBento: React.FC<BentoProps> = ({
       )}
 
       <BentoCardGrid gridRef={gridRef}>
-        <div className="card-responsive grid gap-2">
+        <div className="card-responsive grid gap-2 text-center">
           {cardData.map((card, index) => {
             const baseClassName = `card flex flex-col justify-between relative aspect-[4/3] min-h-[200px] w-full max-w-full p-5 rounded-[20px] border border-solid font-light overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(0,0,0,0.15)] ${
               enableBorderGlow ? "card--border-glow" : ""
@@ -767,7 +886,7 @@ const MagicBento: React.FC<BentoProps> = ({
                     </div>
                   )}
                   <div className="card__header flex flex-col justify-between gap-3 relative text-white z-10">
-                    <span className="card__label text-base">{card.label}</span>
+                    <span className="card__label text-[#806EC5] text-base">{card.label}</span>
                     {card.image && !card.backgroundImage && (
                       <img 
                         src={card.image} 
@@ -921,7 +1040,7 @@ const MagicBento: React.FC<BentoProps> = ({
                   </div>
                 )}
                 <div className="card__header flex justify-between gap-3 relative text-white z-10">
-                  <span className="card__label text-base">{card.label}</span>
+                  <span className="card__label text-base font-goldman font-bold tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">{card.label}</span>
                   {card.image && !card.backgroundImage && (
                     <img 
                       src={card.image} 
@@ -937,7 +1056,7 @@ const MagicBento: React.FC<BentoProps> = ({
                     {card.title}
                   </h3>
                   <p
-                    className={`card__description text-xs leading-5 opacity-90 ${textAutoHide ? "text-clamp-2" : ""}`}
+                    className={`card__description font-bitcount text-white/80 text-sm leading-5 opacity-90 ${textAutoHide ? "text-clamp-2" : ""}`}
                   >
                     {card.description}
                   </p>

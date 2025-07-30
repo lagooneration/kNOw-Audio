@@ -101,16 +101,23 @@ export function HomePage() {
   };
 
   return (
-    <div className="dark relative min-h-screen">
+    <div className="dark relative min-h-screen bg-black">
       {/* DarkVeil as background */}
-      <div className="fixed inset-0 z-0">
+      <div className="absolute inset-0 z-0">
         <DarkVeil />
       </div>
       
       <Container className="relative z-10">
         <div className="max-w-5xl mx-auto space-y-8 py-8">
           <div className='text-center mb-8'>
-            <h1 className="text-3xl font-semibold text-white/90 mb-4">Know Audio</h1>
+            <h1 className="text-4xl font-bold text-white mb-4 font-goldman tracking-wider relative z-10">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-blue-500 to-purple-600">
+                Know Audio
+              </span>
+              <div className="absolute inset-0 blur-sm opacity-50 bg-gradient-to-r from-purple-400 via-blue-500 to-purple-600 bg-clip-text text-transparent -z-10">
+                Know Audio
+              </div>
+            </h1>
             <Search />
           </div>
 
@@ -260,13 +267,13 @@ export function HomePage() {
             <CardContent className="p-8 relative z-10">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="text-center md:text-left">
-                  <h3 className="text-2xl font-semibold text-white mb-2">Want to Contribute?</h3>
-                  <p className="text-slate-300 max-w-md">
+                  <h3 className="text-2xl font-bitcount font-semibold text-white/70 mb-2">Want to Contribute?</h3>
+                  <p className="text-slate-300 font-goldman max-w-md text-white/60">
                     KnowAudio is an open-source project. We welcome contributions from developers, 
                     audio engineers, and music enthusiasts.
                   </p>
                 </div>
-                <div className="flex justify-center">
+                <div className="flex justify-center opacity-70 hover:opacity-100 transition-opacity duration-300">
                   <Gitbutton repoUrl="https://github.com/lagooneration/know-audio" />
                 </div>
               </div>

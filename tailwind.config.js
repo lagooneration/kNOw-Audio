@@ -9,6 +9,8 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
+        goldman: ['Goldman', 'sans-serif'],
+        bitcount: ['Bitcount', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border) / <alpha-value>)",
