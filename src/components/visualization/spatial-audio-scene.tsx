@@ -386,18 +386,7 @@ export function SpatialAudioScene({
   const [dropPosition, setDropPosition] = useState({ x: 0, y: 0 });
   const [fftData, setFftData] = useState<Float32Array | null>(null);
   const [disableBlobDragging, setDisableBlobDragging] = useState(false);
-  const [showNavigationHelp, setShowNavigationHelp] = useState(true);
-  
-  // Hide navigation help after 5 seconds
-  useEffect(() => {
-    if (showNavigationHelp) {
-      const timer = setTimeout(() => {
-        setShowNavigationHelp(false);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [showNavigationHelp]);
+  const [showNavigationHelp] = useState(true); // Always show navigation help
   
   // Fetch FFT data periodically when playing
   useEffect(() => {
@@ -495,11 +484,16 @@ export function SpatialAudioScene({
       {/* Navigation help overlay */}
       {showNavigationHelp && (
         <div className="navigation-help">
-          <p className="mb-1 font-medium">3D Navigation Controls:</p>
-          <p>
-            Move: <span className="key-control">W</span> <span className="key-control">A</span> <span className="key-control">S</span> <span className="key-control">D</span> | 
-            Look: Move cursor or right-click drag
-          </p>
+          <div className="flex items-center">
+            <div className="mr-1">Move:</div>
+            <span className="key-control">W</span><span className="key-control">A</span><span className="key-control">S</span><span className="key-control">D</span>
+            <div className="mx-1 h-3 w-px bg-gray-500"></div>
+            <span className="key-control">Space</span>
+            <span className="mx-1">Up</span>
+            <div className="mx-1 h-3 w-px bg-gray-500"></div>
+            <span className="key-control">Shift</span>
+            <span className="mx-1">Down</span>
+          </div>
         </div>
       )}
       
@@ -581,22 +575,6 @@ export function SpatialAudioScene({
           enablePan={false} 
         />
       </Canvas>
-      
-      {/* Coordinate axis indicator */}
-      <div className="coordinate-axis">
-        <div className="axis-label axis-x">
-          <span className="mr-2">X</span>
-          <div className="w-4 h-1 bg-current"></div>
-        </div>
-        <div className="axis-label axis-y">
-          <span className="mr-2">Y</span>
-          <div className="w-4 h-1 bg-current"></div>
-        </div>
-        <div className="axis-label axis-z">
-          <span className="mr-2">Z</span>
-          <div className="w-4 h-1 bg-current"></div>
-        </div>
-      </div>
     </div>
   );
 }

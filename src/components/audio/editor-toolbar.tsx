@@ -1,5 +1,6 @@
 import '../audio/editor-styles.css';
-import { LottiePlayButton } from '../ui/lottie-play-button';
+import '../audio/play-button.css';
+import Play from '../ui/play';
 
 // Format time in seconds to mm:ss format
 const formatTime = (timeInSeconds: number): string => {
@@ -47,14 +48,17 @@ export function EditorToolbar({
         </div>
         
         <div className="h-6 w-px bg-border"></div>
-         {/* Play/Pause Button */}
-        <div className="mr-4">
-          <LottiePlayButton 
+         
+        {/* Play/Pause Button */}
+        <div className="flex items-center justify-center w-12 mx-2 editor-play-button">
+          <Play 
             isPlaying={isPlaying} 
             onClick={onPlayPause}
-            size={40}
+            size={36}
           />
         </div>
+        
+        <div className="h-6 w-px bg-border"></div>
         
         <div className="flex items-center space-x-2">
           <span className="text-xs text-muted-foreground">Time:</span>

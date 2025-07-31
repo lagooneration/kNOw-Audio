@@ -1,0 +1,25 @@
+/* Custom styling for the Play button in the editor toolbar */
+.editor-play-button {
+  transform-origin: center;
+  position: relative;
+}
+
+.editor-play-button .container {
+  width: 120px !important;
+  height: 120px !important;
+}
+
+.editor-play-button .play-icon {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.editor-play-button .pause-icon {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* Dark theme adjustment */
+.editor-play-button .play-btn::before {
+  background-color: #121212;
+}
