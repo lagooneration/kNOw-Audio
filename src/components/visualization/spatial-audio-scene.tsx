@@ -19,6 +19,7 @@ interface AudioBlobProps {
   onDrag: (position: { x: number; y: number; z: number }) => void;
   onDragEnd: () => void;
   analyzer?: Tone.Analyser | null;
+  disableDragging?: boolean;
 }
 
 function AudioBlob({
@@ -32,7 +33,8 @@ function AudioBlob({
   onDragStart,
   onDrag,
   onDragEnd,
-  analyzer
+  analyzer,
+  disableDragging = false
 }: AudioBlobProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
@@ -94,6 +96,10 @@ function AudioBlob({
   });
   
   const handlePointerDown = () => {
+    if (disableDragging) {
+      onClick();
+      return;
+    }
     setIsDragging(true);
     onDragStart();
     gl.domElement.style.cursor = 'grabbing';
@@ -177,11 +183,37 @@ function AudioBlob({
 // Grid floor component
 function GridFloor() {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-      <planeGeometry args={[20, 20]} />
-      <meshStandardMaterial color="#222" transparent opacity={0.5} />
-      <gridHelper args={[20, 20, '#666', '#444']} position={[0, 0.01, 0]} rotation={[Math.PI / 2, 0, 0]} />
-    </mesh>
+    <>
+      {/* Main floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[100, 100]} />
+        <meshStandardMaterial color="#1a1a2e" transparent opacity={0.6} />
+      </mesh>
+      
+      {/* Grid helper */}
+      <gridHelper args={[100, 100, '#4a5568', '#2d3748']} position={[0, 0.01, 0]} />
+      
+      {/* Center marker */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.5, 0.7, 32]} />
+        <meshBasicMaterial color="#4299e1" transparent opacity={0.7} />
+      </mesh>
+      
+      {/* Coordinate axes for reference */}
+      <group position={[0, 0.05, 0]}>
+        {/* X axis (red) */}
+        <mesh position={[5, 0, 0]}>
+          <boxGeometry args={[10, 0.05, 0.05]} />
+          <meshBasicMaterial color="#f56565" />
+        </mesh>
+        
+        {/* Z axis (blue) */}
+        <mesh position={[0, 0, 5]}>
+          <boxGeometry args={[0.05, 0.05, 10]} />
+          <meshBasicMaterial color="#4299e1" />
+        </mesh>
+      </group>
+    </>
   );
 }
 
@@ -193,6 +225,150 @@ interface SpatialAudioSceneProps {
   onAudioDropped?: (id: string, position: { x: number; y: number; z: number }) => void;
   analyzer?: Tone.Analyser | null;
   isPlaying?: boolean;
+}
+
+// WASD controls component
+function WASDControls() {
+  const { camera, gl } = useThree();
+  const keys = useRef<{[key: string]: boolean}>({});
+  const moveSpeed = useRef(0.1);
+  const rotateSpeed = useRef(0.02);
+  const mouseDown = useRef(false);
+  const lastMousePosition = useRef({ x: 0, y: 0 });
+  const cursorPanningActive = useRef(true);
+  
+  // Set initial camera angle (slightly elevated and tilted)
+  useEffect(() => {
+    // Position the camera at an angle (not completely horizontal)
+    camera.position.set(0, 5, 10);
+    // Tilt the camera down slightly
+    camera.rotation.x = -Math.PI / 12; // -15 degrees
+  }, [camera]);
+  
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keys.current[e.key.toLowerCase()] = true;
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keys.current[e.key.toLowerCase()] = false;
+    };
+    
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 2) { // Right mouse button
+        mouseDown.current = true;
+        lastMousePosition.current = { x: e.clientX, y: e.clientY };
+        gl.domElement.style.cursor = 'grabbing';
+        cursorPanningActive.current = false; // Disable cursor panning during manual rotation
+      }
+    };
+    
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 2) { // Right mouse button
+        mouseDown.current = false;
+        gl.domElement.style.cursor = 'auto';
+        cursorPanningActive.current = true; // Re-enable cursor panning
+      }
+    };
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (mouseDown.current) {
+        const dx = e.clientX - lastMousePosition.current.x;
+        const dy = e.clientY - lastMousePosition.current.y;
+        
+        if (dx !== 0 || dy !== 0) {
+          camera.rotation.y -= dx * rotateSpeed.current;
+          camera.rotation.x -= dy * rotateSpeed.current;
+          // Clamp vertical rotation to avoid flipping
+          camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+        }
+        
+        lastMousePosition.current = { x: e.clientX, y: e.clientY };
+      }
+    };
+    
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault(); // Prevent context menu when right-clicking
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('contextmenu', handleContextMenu);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [camera, gl.domElement.style]);
+  
+  useFrame(() => {
+    // Get the direction vector where the camera is looking
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+    
+    // Get right vector by crossing direction with up vector
+    const right = new THREE.Vector3();
+    right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
+    
+    // Move forward/backward
+    if (keys.current['w']) {
+      camera.position.addScaledVector(direction, moveSpeed.current);
+    }
+    if (keys.current['s']) {
+      camera.position.addScaledVector(direction, -moveSpeed.current);
+    }
+    
+    // Strafe left/right
+    if (keys.current['a']) {
+      camera.position.addScaledVector(right, -moveSpeed.current);
+    }
+    if (keys.current['d']) {
+      camera.position.addScaledVector(right, moveSpeed.current);
+    }
+    
+    // Up/down movement
+    if (keys.current[' ']) { // Space to move up
+      camera.position.y += moveSpeed.current;
+    }
+    if (keys.current['shift']) { // Shift to move down
+      camera.position.y -= moveSpeed.current;
+    }
+    
+    // Cursor-based camera panning
+    if (cursorPanningActive.current) {
+      // Get cursor position
+      const cursor = new THREE.Vector2();
+      cursor.x = (gl.domElement.offsetWidth / 2 - gl.domElement.getBoundingClientRect().left);
+      cursor.y = (gl.domElement.offsetHeight / 2 - gl.domElement.getBoundingClientRect().top);
+      
+      // Calculate cursor distance from center in each dimension (normalized -1 to 1)
+      const mousePosX = gl.domElement.offsetWidth / 2 - cursor.x;
+      const mousePosY = gl.domElement.offsetHeight / 2 - cursor.y;
+      
+      // Calculate panning speed based on cursor position
+      // The closer to the edge, the faster the panning
+      const panX = (mousePosX / (gl.domElement.offsetWidth / 2)) * 0.01;
+      const panY = (mousePosY / (gl.domElement.offsetHeight / 2)) * 0.005;
+      
+      // Apply panning if mouse is within the canvas
+      if (Math.abs(mousePosX) < gl.domElement.offsetWidth / 2 && 
+          Math.abs(mousePosY) < gl.domElement.offsetHeight / 2) {
+        camera.rotation.y += panX;
+        camera.rotation.x += panY;
+        // Clamp vertical rotation to avoid flipping
+        camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+      }
+    }
+  });
+  
+  return null;
 }
 
 export function SpatialAudioScene({
@@ -209,6 +385,19 @@ export function SpatialAudioScene({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [dropPosition, setDropPosition] = useState({ x: 0, y: 0 });
   const [fftData, setFftData] = useState<Float32Array | null>(null);
+  const [disableBlobDragging, setDisableBlobDragging] = useState(false);
+  const [showNavigationHelp, setShowNavigationHelp] = useState(true);
+  
+  // Hide navigation help after 5 seconds
+  useEffect(() => {
+    if (showNavigationHelp) {
+      const timer = setTimeout(() => {
+        setShowNavigationHelp(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showNavigationHelp]);
   
   // Fetch FFT data periodically when playing
   useEffect(() => {
@@ -231,6 +420,14 @@ export function SpatialAudioScene({
     };
   }, [isPlaying, analyzer]);
   
+  // Control whether blob dragging is enabled
+  useEffect(() => {
+    // Disable blob dragging when a blob is placed for the first time
+    if (audioSources.length > 0 && !disableBlobDragging) {
+      setDisableBlobDragging(true);
+    }
+  }, [audioSources, disableBlobDragging]);
+
   // Handle drops from audio library
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -294,7 +491,30 @@ export function SpatialAudioScene({
           }}
         />
       )}
-      <Canvas camera={{ position: [0, 5, 10], fov: 60 }}>
+
+      {/* Navigation help overlay */}
+      {showNavigationHelp && (
+        <div className="navigation-help">
+          <p className="mb-1 font-medium">3D Navigation Controls:</p>
+          <p>
+            Move: <span className="key-control">W</span> <span className="key-control">A</span> <span className="key-control">S</span> <span className="key-control">D</span> | 
+            Look: Move cursor or right-click drag
+          </p>
+        </div>
+      )}
+      
+      <Canvas 
+        camera={{ 
+          position: [0, 5, 10], 
+          fov: 60,
+          near: 0.1,
+          far: 1000
+        }}
+        onCreated={({ gl }) => {
+          gl.setClearColor(new THREE.Color('#1a1a2e'));
+          gl.shadowMap.enabled = true;
+        }}
+      >
         <ambientLight intensity={0.4} />
         <directionalLight 
           position={[5, 10, 5]} 
@@ -303,6 +523,12 @@ export function SpatialAudioScene({
           shadow-mapSize-width={1024} 
           shadow-mapSize-height={1024} 
         />
+        
+        {/* Add fog for depth perception */}
+        <fog attach="fog" args={['#1a1a2e', 15, 40]} />
+        
+        {/* Add WASD controls */}
+        <WASDControls />
         
         {/* Audio listener to update audio based on camera */}
         <AudioListener />
@@ -321,6 +547,7 @@ export function SpatialAudioScene({
             isSelected={!!source.isSelected}
             audioData={fftData || audioAnalysisData}
             analyzer={analyzer}
+            disableDragging={disableBlobDragging}
             onClick={() => onAudioSelected(source.id)}
             onDragStart={() => {
               onAudioPlaced({
@@ -348,15 +575,28 @@ export function SpatialAudioScene({
         
         {/* Controls */}
         <OrbitControls 
-          enableDamping 
-          dampingFactor={0.1} 
-          rotateSpeed={0.5} 
-          minDistance={2} 
-          maxDistance={20} 
-          minPolarAngle={0} 
-          maxPolarAngle={Math.PI / 2} 
+          enableDamping={false}
+          enableRotate={false} 
+          enableZoom={true} 
+          enablePan={false} 
         />
       </Canvas>
+      
+      {/* Coordinate axis indicator */}
+      <div className="coordinate-axis">
+        <div className="axis-label axis-x">
+          <span className="mr-2">X</span>
+          <div className="w-4 h-1 bg-current"></div>
+        </div>
+        <div className="axis-label axis-y">
+          <span className="mr-2">Y</span>
+          <div className="w-4 h-1 bg-current"></div>
+        </div>
+        <div className="axis-label axis-z">
+          <span className="mr-2">Z</span>
+          <div className="w-4 h-1 bg-current"></div>
+        </div>
+      </div>
     </div>
   );
 }

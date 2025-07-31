@@ -41,10 +41,10 @@ export function EditorSidebar({
   const [expanded, setExpanded] = useState(false);
 
   const tabs = [
-    { id: 'library', label: 'Library', icon: '🎵' },
-    { id: 'effects', label: 'Effects', icon: '🎛️' },
-    { id: 'mixing', label: 'Mixing', icon: '🔊' },
-    { id: 'export', label: 'Export', icon: '💾' },
+    { id: 'library', label: 'Library', icon: '/images/folder.svg' },
+    { id: 'effects', label: 'Effects', icon: '/images/edit.svg' },
+    { id: 'mixing', label: 'Mixing', icon: '/images/mix.svg' },
+    { id: 'export', label: 'Export', icon: '/images/export.svg' },
   ];
 
   return (
@@ -59,7 +59,9 @@ export function EditorSidebar({
             className={`sidebar-nav-item ${activeTab === tab.id ? 'active' : ''}`}
             onClick={() => onTabChange(tab.id)}
           >
-            <span className="item-icon">{tab.icon}</span>
+            <span className="item-icon">
+              <img src={tab.icon} alt={tab.label} width="24" height="24" />
+            </span>
             <span className="item-label">{tab.label}</span>
           </div>
         ))}

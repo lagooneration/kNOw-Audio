@@ -52,6 +52,33 @@
   z-index: 1000;
 }
 
+/* 2D Position Control Canvas */
+.position-control-canvas {
+  background-color: rgba(30, 30, 40, 0.4);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  border-radius: 4px;
+  cursor: crosshair;
+}
+
+.position-control-canvas:hover {
+  border-color: rgba(100, 150, 255, 0.6);
+}
+
+.position-control-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: rgba(200, 200, 220, 0.7);
+  margin-top: 4px;
+}
+
+.audio-blob-position-control {
+  padding: 10px;
+  background-color: rgba(40, 40, 60, 0.3);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
 /* Sidebar styles */
 .editor-sidebar {
   position: absolute;
@@ -96,6 +123,29 @@
 
 .sidebar-nav-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-nav-item .item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.sidebar-nav-item .item-icon img {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(0.7);
+  transition: filter 0.2s ease;
+}
+
+.sidebar-nav-item:hover .item-icon img {
+  filter: brightness(0) invert(0.9);
+}
+
+.sidebar-nav-item.active .item-icon img {
+  filter: brightness(0) invert(1);
 }
 
 .sidebar-nav-item.active {
@@ -183,4 +233,80 @@
 .scene-type-option.active {
   background-color: var(--primary);
   color: white;
+}
+
+/* 3D Navigation */
+.navigation-help {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: opacity 0.3s ease;
+  animation: fadeInOut 5s forwards;
+  pointer-events: none;
+}
+
+.key-control {
+  background-color: rgba(80, 80, 100, 0.8);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 0 2px;
+  font-family: monospace;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 3D Scene */
+.scene-floor {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(66, 153, 225, 0.3) 0%, rgba(49, 130, 206, 0.1) 100%);
+}
+
+.scene-grid line {
+  stroke: rgba(100, 100, 120, 0.2);
+}
+
+.coordinate-axis {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background-color: rgba(0, 0, 0, 0.6);
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.axis-label {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+.axis-x {
+  color: #f56565;
+}
+
+.axis-y {
+  color: #48bb78;
+}
+
+.axis-z {
+  color: #4299e1;
 }

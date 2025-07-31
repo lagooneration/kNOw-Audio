@@ -787,6 +787,15 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     };
   }, [isPlaying]);
   
+  // Handle audio position change (from 2D view)
+  const handleAudioPositionChange = useCallback((id: string, position: { x: number; y: number; z: number }) => {
+    handleAudioPlaced({
+      id,
+      position,
+      isDragging: false
+    });
+  }, [handleAudioPlaced]);
+
   return (
     <div className="visualization-container flex flex-col h-screen w-full dark text-foreground">
       <div className="flex flex-1 overflow-hidden relative">
@@ -843,6 +852,9 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
         <EditorRightSidebar 
           isOscillatorEnabled={isOscillatorEnabled}
           onOscillatorEnabledChange={setIsOscillatorEnabled}
+          audioSources={spatialAudioSources}
+          selectedAudioId={library.selectedItemId}
+          onAudioPositionChange={handleAudioPositionChange}
         />
       </div>
       
