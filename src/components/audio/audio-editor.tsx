@@ -15,6 +15,7 @@ import { SpatialAudioScene } from '../visualization/spatial-audio-scene';
 import { useAudioLibrary } from '../../hooks/use-audio-library';
 import { type AudioData } from '../../types/audio';
 import { type AudioPlacement, type SpatialAudioData } from '../../types/spatial-audio';
+import { updateListenerPosition, createSpatialAudioSource, updateSpatialAudioPosition } from '../../utils/spatial-audio-processing';
 
 interface AudioEditorProps {
   audioData?: AudioData;
@@ -47,6 +48,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
   
   // Audio processing references
   const playerRefs = useRef(new Map<string, Tone.Player>());
+  const pannerRefs = useRef(new Map<string, Tone.Panner3D>());
   const reverbRef = useRef<Tone.Reverb | null>(null);
   const delayRef = useRef<Tone.FeedbackDelay | null>(null);
   const distortionRef = useRef<Tone.Distortion | null>(null);
@@ -60,20 +62,51 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
 
   // Initialize Tone.js
   useEffect(() => {
-    // Setup Tone.js
-    Tone.start();
+    // Setup Tone.js - initiate audio context
+    Tone.start().then(() => {
+      console.log("Tone.js started successfully");
+    }).catch(err => {
+      console.error("Error starting Tone.js:", err);
+    });
     
     // Create effects
-    const reverb = new Tone.Reverb(3);
-    const delay = new Tone.FeedbackDelay(0.25, 0.5);
-    const distortion = new Tone.Distortion(0.4);
-    const filter = new Tone.Filter(filterFreq, 'lowpass');
+    const reverb = new Tone.Reverb({
+      decay: 3,
+      wet: 0.5
+    }).toDestination();
     
-    // Create analyzer
-    const analyzer = new Tone.Analyser('fft', 512);
+    const delay = new Tone.FeedbackDelay({
+      delayTime: 0.25,
+      feedback: 0.5,
+      wet: 0.5
+    }).toDestination();
+    
+    const distortion = new Tone.Distortion({
+      distortion: 0.4,
+      wet: 0.5
+    }).toDestination();
+    
+    const filter = new Tone.Filter({
+      frequency: filterFreq,
+      type: 'lowpass',
+      Q: 1
+    }).toDestination();
+    
+    // Create analyzer - will be connected to all audio sources
+    const analyzer = new Tone.Analyser({
+      type: 'fft',
+      size: 512
+    });
+    analyzer.toDestination();
     
     // Store references to dispose later
     const playersToDispose = new Map<string, Tone.Player>();
+    const pannersToDispose = new Map<string, Tone.Panner3D>();
+    
+    // Copy current panners to dispose list
+    pannerRefs.current.forEach((panner, id) => {
+      pannersToDispose.set(id, panner);
+    });
     
     // Save references
     reverbRef.current = reverb;
@@ -85,54 +118,111 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     // Add initial audio if provided
     if (audioData) {
       const initialAudioId = uuidv4();
-      const player = new Tone.Player({
-        url: audioData.url,
-        loop: true,
-        playbackRate: playbackSpeed,
-        onload: () => {
-          console.log('Audio loaded');
-          // Set total duration once loaded
-          if (player.buffer) {
-            setTotalDuration(player.buffer.duration);
+      
+      try {
+        const player = new Tone.Player({
+          url: audioData.url,
+          loop: true,
+          playbackRate: playbackSpeed,
+          onload: () => {
+            console.log('Initial audio loaded successfully');
+            // Set total duration once loaded
+            if (player.buffer) {
+              setTotalDuration(player.buffer.duration);
+            }
           }
-        }
-      }).toDestination();
-      
-      // Connect player to analyzer
-      player.connect(analyzer);
-      
-      // Store in playerRefs and for cleanup
-      playerRefs.current.set(initialAudioId, player);
-      playersToDispose.set(initialAudioId, player);
-      
-      // Create spatial audio source
-      const initialSource: SpatialAudioData = {
-        ...audioData,
-        id: initialAudioId,
-        name: audioData.file.name,
-        color: '#FF5F6D',
-        position: { x: 0, y: 0.5, z: 0 },
-        isPlaying: false,
-        volume: 1,
-        isSelected: true
-      };
-      
-      setSpatialAudioSources([initialSource]);
+        });
+        
+        // Create panner for 3D positioning
+        const panner = new Tone.Panner3D({
+          positionX: 0,
+          positionY: 0.5,
+          positionZ: 0,
+          refDistance: 1,
+          rolloffFactor: 1.5,
+          distanceModel: "exponential",
+          maxDistance: 10000,
+          panningModel: "HRTF"
+        });
+        
+        // Connect player to panner to analyzer
+        player.connect(panner);
+        panner.connect(analyzer);
+        
+        // Store in refs and for cleanup
+        playerRefs.current.set(initialAudioId, player);
+        pannerRefs.current.set(initialAudioId, panner);
+        playersToDispose.set(initialAudioId, player);
+        pannersToDispose.set(initialAudioId, panner);
+        
+        // Create spatial audio source
+        const initialSource: SpatialAudioData = {
+          ...audioData,
+          id: initialAudioId,
+          name: audioData.file.name,
+          color: '#FF5F6D',
+          position: { x: 0, y: 0.5, z: 0 },
+          isPlaying: false,
+          volume: 1,
+          isSelected: true
+        };
+        
+        setSpatialAudioSources([initialSource]);
+      } catch (error) {
+        console.error("Error setting up initial audio:", error);
+      }
     }
     
     // Cleanup
     return () => {
       // Dispose of all players
-      playersToDispose.forEach(player => {
-        player.stop();
-        player.dispose();
+      playersToDispose.forEach((player, id) => {
+        try {
+          console.log(`Disposing player ${id}`);
+          player.stop();
+          player.disconnect();
+          player.dispose();
+        } catch (error) {
+          console.error(`Error disposing player ${id}:`, error);
+        }
       });
       
-      if (reverbRef.current) reverbRef.current.dispose();
-      if (delayRef.current) delayRef.current.dispose();
-      if (distortionRef.current) distortionRef.current.dispose();
-      if (filterRef.current) filterRef.current.dispose();
-      if (analyzerRef.current) analyzerRef.current.dispose();
+      // Dispose of all panners
+      pannersToDispose.forEach((panner, id) => {
+        try {
+          console.log(`Disposing panner ${id}`);
+          panner.disconnect();
+          panner.dispose();
+        } catch (error) {
+          console.error(`Error disposing panner ${id}:`, error);
+        }
+      });
+      
+      // Dispose of effects
+      if (reverbRef.current) {
+        reverbRef.current.disconnect();
+        reverbRef.current.dispose();
+      }
+      
+      if (delayRef.current) {
+        delayRef.current.disconnect();
+        delayRef.current.dispose();
+      }
+      
+      if (distortionRef.current) {
+        distortionRef.current.disconnect();
+        distortionRef.current.dispose();
+      }
+      
+      if (filterRef.current) {
+        filterRef.current.disconnect();
+        filterRef.current.dispose();
+      }
+      
+      if (analyzerRef.current) {
+        analyzerRef.current.disconnect();
+        analyzerRef.current.dispose();
+      }
       
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
@@ -192,6 +282,25 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
       }
     });
   }, [effects]);
+  
+  // Initialize audio context when user clicks play button
+  useEffect(() => {
+    // Add click event listener to document to initialize audio context
+    const handleUserInteraction = () => {
+      if (Tone.context.state !== "running") {
+        console.log("Resuming audio context on user interaction");
+        Tone.context.resume();
+      }
+    };
+
+    document.addEventListener("click", handleUserInteraction);
+    document.addEventListener("touchstart", handleUserInteraction);
+
+    return () => {
+      document.removeEventListener("click", handleUserInteraction);
+      document.removeEventListener("touchstart", handleUserInteraction);
+    };
+  }, []);
   
   // Update filter frequency
   useEffect(() => {
@@ -307,21 +416,98 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
   const togglePlayback = useCallback(() => {
     const newIsPlaying = !isPlaying;
     
-    playerRefs.current.forEach((player) => {
-      if (newIsPlaying) {
-        player.start();
-      } else {
-        player.stop();
-      }
-    });
-    
-    setIsPlaying(newIsPlaying);
-    
-    // Update playing state in spatial audio sources
-    setSpatialAudioSources(prev => 
-      prev.map(source => ({ ...source, isPlaying: newIsPlaying }))
-    );
-  }, [isPlaying]);
+    if (newIsPlaying) {
+      // First ensure Tone.js context is started
+      Tone.context.resume().then(() => {
+        console.log("Audio context resumed successfully");
+        
+        // Create a master analyzer if it doesn't exist
+        if (!analyzerRef.current) {
+          analyzerRef.current = new Tone.Analyser('fft', 512);
+          analyzerRef.current.toDestination();
+        }
+        
+        // Start all players with proper spatial positioning
+        playerRefs.current.forEach((player, id) => {
+          try {
+            // Find the spatial data for this player
+            const sourceData = spatialAudioSources.find(source => source.id === id);
+            
+            if (sourceData) {
+              // Ensure the player is properly configured with a panner
+              let panner = pannerRefs.current.get(id);
+              
+              // If we don't have a panner yet, create one
+              if (!panner) {
+                console.log(`Creating new panner for audio source ${id}`);
+                panner = new Tone.Panner3D({
+                  positionX: sourceData.position.x,
+                  positionY: sourceData.position.y,
+                  positionZ: sourceData.position.z,
+                  refDistance: 1,
+                  rolloffFactor: 1.5,
+                  distanceModel: "exponential",
+                  maxDistance: 10000,
+                  panningModel: "HRTF"
+                });
+                
+                // Store panner reference
+                pannerRefs.current.set(id, panner);
+              }
+              
+              // Disconnect everything to rebuild the audio chain
+              player.disconnect();
+              
+              // Connect player to panner
+              player.connect(panner);
+              
+              // Connect panner to analyzer and destination
+              if (analyzerRef.current) {
+                panner.connect(analyzerRef.current);
+              } else {
+                panner.toDestination();
+              }
+              
+              // Start playback with synchronized timing
+              if (player.state !== "started") {
+                console.log(`Starting playback for audio source ${id}`);
+                player.start();
+              }
+            }
+          } catch (error) {
+            console.error(`Error starting audio ${id}:`, error);
+          }
+        });
+        
+        // Update playing state
+        setIsPlaying(true);
+        
+        // Update playing state in spatial audio sources
+        setSpatialAudioSources(prev => 
+          prev.map(source => ({ ...source, isPlaying: true }))
+        );
+      }).catch(error => {
+        console.error("Could not resume audio context:", error);
+      });
+    } else {
+      // Stop all players
+      playerRefs.current.forEach((player) => {
+        try {
+          console.log(`Stopping playback for audio source ${player}`);
+          player.stop();
+        } catch (error) {
+          console.error("Error stopping player:", error);
+        }
+      });
+      
+      setIsPlaying(false);
+      
+      // Update playing state in spatial audio sources
+      setSpatialAudioSources(prev => 
+        prev.map(source => ({ ...source, isPlaying: false }))
+      );
+    }
+  }, [isPlaying, spatialAudioSources]);
   
   // Toggle effects
   const toggleEffect = useCallback((effect: keyof typeof effects) => {
@@ -355,17 +541,64 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
         return source;
       });
     });
+
+    // Update the panner position for this audio source
+    const panner = pannerRefs.current.get(placement.id);
+    if (panner) {
+      panner.positionX.value = placement.position.x;
+      panner.positionY.value = placement.position.y;
+      panner.positionZ.value = placement.position.z;
+    } else {
+      // If no panner exists yet, create one
+      const player = playerRefs.current.get(placement.id);
+      if (player) {
+        // Create a new panner with updated position
+        const newPanner = new Tone.Panner3D({
+          positionX: placement.position.x,
+          positionY: placement.position.y,
+          positionZ: placement.position.z,
+          refDistance: 1,
+          rolloffFactor: 1.5,
+          distanceModel: "exponential",
+          maxDistance: 10000,
+          panningModel: "HRTF"
+        });
+        
+        // Disconnect player from all outputs
+        player.disconnect();
+        
+        // Connect to new panner
+        player.connect(newPanner);
+        
+        // Connect to effects chain
+        if (analyzerRef.current) {
+          newPanner.connect(analyzerRef.current);
+          analyzerRef.current.toDestination();
+        } else {
+          newPanner.toDestination();
+        }
+        
+        // Store the panner reference
+        pannerRefs.current.set(placement.id, newPanner);
+      }
+    }
   }, []);
   
   // Handle audio dropped from library to canvas
   const handleAudioDropped = useCallback((id: string, position: { x: number; y: number; z: number }) => {
     // Find the audio item in the library
     const audioItem = library.items.find(item => item.id === id);
-    if (!audioItem || !audioItem.audioData) return;
+    if (!audioItem || !audioItem.audioData) {
+      console.error("Could not find audio item in library:", id);
+      return;
+    }
+    
+    console.log(`Adding audio source ${id} at position:`, position);
     
     // Check if the audio is already in the scene
     const existingSource = spatialAudioSources.find(source => source.id === id);
     if (existingSource) {
+      console.log(`Audio source ${id} already exists, updating position`);
       // Update position of existing source
       handleAudioPlaced({
         id,
@@ -375,12 +608,74 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
       return;
     }
     
+    // Create or get player for this audio
+    let player = playerRefs.current.get(id);
+    
+    if (!player) {
+      // Create new player with the audio URL
+      try {
+        console.log(`Creating new player for audio ${id}`);
+        player = new Tone.Player({
+          url: audioItem.audioData.url,
+          loop: true,
+          playbackRate: playbackSpeed,
+          onload: () => {
+            console.log(`Audio ${id} loaded for spatial positioning`);
+            // Set total duration once loaded
+            if (player && player.buffer) {
+              setTotalDuration(player.buffer.duration);
+            }
+          }
+        });
+        
+        // Create panner for spatial audio
+        const panner = new Tone.Panner3D({
+          positionX: position.x,
+          positionY: position.y,
+          positionZ: position.z,
+          refDistance: 1,
+          rolloffFactor: 1.5,
+          distanceModel: "exponential",
+          maxDistance: 10000,
+          panningModel: "HRTF" // More realistic 3D audio
+        });
+        
+        // Connect player to panner
+        player.connect(panner);
+        
+        // Connect to analyzer if available
+        if (analyzerRef.current) {
+          panner.connect(analyzerRef.current);
+        } else {
+          // Connect directly to destination if no analyzer
+          panner.toDestination();
+        }
+        
+        // Store player and panner for later use
+        playerRefs.current.set(id, player);
+        pannerRefs.current.set(id, panner);
+        
+        // Start playing if currently playing
+        if (isPlaying) {
+          console.log(`Starting playback for new audio ${id}`);
+          Tone.context.resume().then(() => {
+            player?.start();
+          }).catch(err => {
+            console.error("Could not resume audio context:", err);
+          });
+        }
+      } catch (error) {
+        console.error(`Error creating player for audio ${id}:`, error);
+        return;
+      }
+    }
+    
     // Create a new spatial audio source
     const newSource: SpatialAudioData = {
       ...audioItem.audioData,
       id: audioItem.id,
       name: audioItem.name,
-      color: audioItem.color,
+      color: audioItem.color || '#' + Math.floor(Math.random()*16777215).toString(16), // Random color if none
       position,
       isPlaying: isPlaying,
       volume: 1,
@@ -392,7 +687,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     
     // Select this audio
     selectAudioFile(id);
-  }, [library.items, spatialAudioSources, isPlaying, selectAudioFile, handleAudioPlaced]);
+  }, [library.items, spatialAudioSources, isPlaying, selectAudioFile, handleAudioPlaced, playbackSpeed]);
   
   // Handle selecting an audio in the 3D scene
   const handleAudioSelected = useCallback((id: string) => {
@@ -522,6 +817,8 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
                   onAudioPlaced={handleAudioPlaced}
                   onAudioSelected={handleAudioSelected}
                   onAudioDropped={handleAudioDropped}
+                  analyzer={analyzerRef.current}
+                  isPlaying={isPlaying}
                 />
               ) : visualizationType === 'cinematic' ? (
                 <Canvas camera={{ position: [0, 0, 15], fov: 60 }}>

@@ -66,7 +66,7 @@
 
 .editor-sidebar:hover,
 .editor-sidebar.expanded {
-  width: 240px;
+  width: 320px;
 }
 
 .sidebar-nav {
@@ -121,7 +121,7 @@
   left: 60px;
   top: 0;
   bottom: 0;
-  width: 180px;
+  width: 260px;
   background-color: rgba(10, 10, 20, 0.6);
   backdrop-filter: blur(10px);
   padding: 15px;
@@ -135,6 +135,23 @@
   align-items: center;
   gap: 10px;
   margin-right: 20px;
+}
+
+/* Lottie Play Button */
+.lottie-play-button {
+  background-color: rgba(100, 100, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(100, 100, 255, 0.3);
+}
+
+.lottie-play-button:hover {
+  transform: scale(1.05);
+  background-color: rgba(100, 100, 255, 0.2);
+  box-shadow: 0 0 15px rgba(100, 200, 255, 0.5);
 }
 
 .scene-type-label {

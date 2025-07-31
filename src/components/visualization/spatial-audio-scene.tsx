@@ -1,9 +1,11 @@
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
+import * as Tone from 'tone';
 import { type SpatialAudioData, type AudioPlacement } from '../../types/spatial-audio';
 import { createAudioBlobMaterial, updateAudioBlobShader } from './audio-blob-shader';
+import { AudioListener } from './audio-listener';
 
 interface AudioBlobProps {
   position: [number, number, number];
@@ -16,6 +18,7 @@ interface AudioBlobProps {
   onDragStart: () => void;
   onDrag: (position: { x: number; y: number; z: number }) => void;
   onDragEnd: () => void;
+  analyzer?: Tone.Analyser | null;
 }
 
 function AudioBlob({
@@ -28,12 +31,13 @@ function AudioBlob({
   onClick,
   onDragStart,
   onDrag,
-  onDragEnd
+  onDragEnd,
+  analyzer
 }: AudioBlobProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const { camera, raycaster, mouse, gl, clock } = useThree();
+  const { camera, raycaster, mouse, gl } = useThree();
   const plane = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const intersection = useRef<THREE.Vector3>(new THREE.Vector3());
   
@@ -52,9 +56,17 @@ function AudioBlob({
     
     // Update shader uniforms
     if (materialRef.current) {
+      // Get real-time FFT data if analyzer is available
+      let fftData: Float32Array;
+      if (analyzer && isPlaying) {
+        fftData = analyzer.getValue() as Float32Array;
+      } else {
+        fftData = audioData || new Float32Array(512);
+      }
+      
       updateAudioBlobShader(
         materialRef.current,
-        audioData || new Float32Array(512),
+        fftData,
         isPlaying,
         state.clock.elapsedTime
       );
@@ -179,6 +191,8 @@ interface SpatialAudioSceneProps {
   onAudioPlaced: (placement: AudioPlacement) => void;
   onAudioSelected: (id: string) => void;
   onAudioDropped?: (id: string, position: { x: number; y: number; z: number }) => void;
+  analyzer?: Tone.Analyser | null;
+  isPlaying?: boolean;
 }
 
 export function SpatialAudioScene({
@@ -186,12 +200,36 @@ export function SpatialAudioScene({
   audioAnalysisData,
   onAudioPlaced,
   onAudioSelected,
-  onAudioDropped
+  onAudioDropped,
+  analyzer,
+  isPlaying = false
 }: SpatialAudioSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [dropPosition, setDropPosition] = useState({ x: 0, y: 0 });
+  const [fftData, setFftData] = useState<Float32Array | null>(null);
+  
+  // Fetch FFT data periodically when playing
+  useEffect(() => {
+    if (!isPlaying || !analyzer) return;
+    
+    const updateFFT = () => {
+      try {
+        const data = analyzer.getValue() as Float32Array;
+        setFftData(data);
+      } catch (error) {
+        console.error("Error getting FFT data:", error);
+      }
+    };
+    
+    // Update FFT data at animation frame rate
+    const intervalId = setInterval(updateFFT, 1000 / 30); // ~30fps
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isPlaying, analyzer]);
   
   // Handle drops from audio library
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -266,6 +304,9 @@ export function SpatialAudioScene({
           shadow-mapSize-height={1024} 
         />
         
+        {/* Audio listener to update audio based on camera */}
+        <AudioListener />
+        
         {/* Scene elements */}
         <GridFloor />
         
@@ -278,7 +319,8 @@ export function SpatialAudioScene({
             name={source.name}
             isPlaying={source.isPlaying}
             isSelected={!!source.isSelected}
-            audioData={audioAnalysisData}
+            audioData={fftData || audioAnalysisData}
+            analyzer={analyzer}
             onClick={() => onAudioSelected(source.id)}
             onDragStart={() => {
               onAudioPlaced({

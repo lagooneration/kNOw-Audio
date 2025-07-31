@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container } from '../components/ui/container';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Button } from '../components/ui/button';
 import { FileUpload } from '../components/audio/file-upload';
 import { FrequencyOverlapVisualizer } from '../components/audio/frequency-overlap';
 import { EQSuggestionsDisplay } from '../components/audio/eq-suggestions';
 import { FrequencySpectrum } from '../components/audio/frequency-spectrum';
 import { FrequencyInterferenceExplanation } from '../components/audio/frequency-interference-explanation';
 import { CombinedAudioVisualizer } from '../components/audio/combined-audio-visualizer';
+import { TrackInfoCard } from '../components/audio/track-info-card';
 import { useAudioMixing } from '../hooks/use-audio-mixing';
 import { analyzeFrequencyOverlap, generateEQSuggestions } from '../utils/audio-mixing';
 import type { FrequencyOverlap, EQSuggestion } from '../utils/audio-mixing';
@@ -82,8 +82,8 @@ export function MixingPage() {
   };
 
   return (
-    <div className="dark relative min-h-screen">
-      <div className="fixed inset-0 z-0">
+    <div className="dark relative min-h-screen bg-black">
+      <div className="absolute inset-0 z-0">
         <DarkVeil />
       </div>
       
@@ -127,11 +127,10 @@ export function MixingPage() {
           </div>
           </div>
 
-          <div className="text-center h-4"> 
-          </div>
+          <div className="h-[1px]"/>
           <div className='text-center mb-8'>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bitcount text-white/80 font-bold mb-4">Audio Mixer</h1>
-            <p className="text-foreground text-white/80 font-goldman mb-8">
+            <p className="text-foreground text-white/80 font-goldman text-lg mb-4">
               Upload two audio tracks to analyze frequency overlaps and get EQ suggestions for better mixing.
             </p>
           </div>
@@ -145,34 +144,11 @@ export function MixingPage() {
                   isProcessing={mixingState.isProcessing} 
                 />
               ) : (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex justify-between items-center">
-                      <span>{mixingState.track1.metadata.name}</span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => clearTrack(1)}
-                        className="text-xs h-7"
-                      >
-                        Change
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xs text-muted-foreground grid grid-cols-2 gap-2 mb-3">
-                      <div>Duration: {mixingState.track1.metadata.duration.toFixed(2)}s</div>
-                      <div>Sample Rate: {mixingState.track1.metadata.sampleRate}Hz</div>
-                      <div>Channels: {mixingState.track1.metadata.numberOfChannels}</div>
-                      <div>Format: {mixingState.track1.metadata.type}</div>
-                    </div>
-                    <audio 
-                      src={mixingState.track1.url} 
-                      controls 
-                      className="w-full h-8" 
-                    />
-                  </CardContent>
-                </Card>
+                <TrackInfoCard 
+                  audioData={mixingState.track1}
+                  trackTitle="Track 1"
+                  onChangeTrack={() => clearTrack(1)}
+                />
               )}
             </div>
             
@@ -184,43 +160,20 @@ export function MixingPage() {
                   isProcessing={mixingState.isProcessing} 
                 />
               ) : (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex justify-between items-center">
-                      <span>{mixingState.track2.metadata.name}</span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => clearTrack(2)}
-                        className="text-xs h-7"
-                      >
-                        Change
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xs text-muted-foreground grid grid-cols-2 gap-2 mb-3">
-                      <div>Duration: {mixingState.track2.metadata.duration.toFixed(2)}s</div>
-                      <div>Sample Rate: {mixingState.track2.metadata.sampleRate}Hz</div>
-                      <div>Channels: {mixingState.track2.metadata.numberOfChannels}</div>
-                      <div>Format: {mixingState.track2.metadata.type}</div>
-                    </div>
-                    <audio 
-                      src={mixingState.track2.url} 
-                      controls 
-                      className="w-full h-8" 
-                    />
-                  </CardContent>
-                </Card>
+                <TrackInfoCard 
+                  audioData={mixingState.track2}
+                  trackTitle="Track 2"
+                  onChangeTrack={() => clearTrack(2)}
+                />
               )}
             </div>
           </div>
           
           {mixingState.track1 && mixingState.track2 ? (
             <div className="space-y-6">
-              <Card>
+              <Card className="bg-secondary/20 dark:bg-slate-800/40 backdrop-blur-sm border dark:border-slate-700/50">
                 <CardHeader>
-                  <CardTitle>Frequency Overlap Analysis</CardTitle>
+                  <CardTitle className="text-white/90">Frequency Overlap Analysis</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {analyzing ? (
@@ -229,7 +182,7 @@ export function MixingPage() {
                     </div>
                   ) : (
                     <>
-                      <p className="text-sm text-muted-foreground mb-4">
+                      <p className="text-sm text-white/70 mb-4">
                         This visualization shows the frequency spectrum of both tracks and highlights areas where they overlap.
                         <span className="block mt-1">
                           <span className="inline-block w-3 h-3 bg-orange-500/60 mr-1"></span> Constructive overlaps enhance and complement each other.
@@ -264,7 +217,7 @@ export function MixingPage() {
                         />
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <h3 className="text-lg font-medium mb-2">Track 1 Spectrum</h3>
+                            <h3 className="text-lg font-medium text-white/90 mb-2">Track 1 Spectrum</h3>
                             <FrequencySpectrum
                               audioData={mixingState.track1}
                               height={200}
@@ -272,7 +225,7 @@ export function MixingPage() {
                             />
                           </div>
                           <div>
-                            <h3 className="text-lg font-medium mb-2">Track 2 Spectrum</h3>
+                            <h3 className="text-lg font-medium text-white/90 mb-2">Track 2 Spectrum</h3>
                             <FrequencySpectrum
                               audioData={mixingState.track2}
                               height={200}
@@ -290,12 +243,12 @@ export function MixingPage() {
                 <>
                   <FrequencyInterferenceExplanation overlaps={overlaps} />
                   
-                  <Card>
+                  <Card className="bg-secondary/20 dark:bg-slate-800/40 backdrop-blur-sm border dark:border-slate-700/50">
                     <CardHeader>
-                      <CardTitle>Frequency Band Interference Analysis</CardTitle>
+                      <CardTitle className="text-white/90">Frequency Band Interference Analysis</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">
+                      <p className="text-sm text-white/70 mb-4">
                         This visualization shows both audio tracks in the time domain and how they combine together.
                         Areas with potential interference are highlighted across broader frequency bands.
                       </p>
@@ -332,6 +285,9 @@ export function MixingPage() {
                   />
                 </div>
                 <h3 className="text-xl text-white/70 font-medium mb-2">Ready to Mix</h3>
+                <p className="text-white/60 text-center max-w-md mx-auto">
+                  Upload two audio tracks to analyze frequency overlaps and get EQ suggestions for better mixing.
+                </p>
               </CardContent>
             </Card>
           )}
