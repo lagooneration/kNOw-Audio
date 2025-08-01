@@ -274,6 +274,63 @@
   white-space: nowrap;
 }
 
+/* Uplo custom styles for integration */
+.uplo-wrapper {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.uplo-wrapper:hover {
+  transform: translateY(-2px);
+}
+
+.uplo-wrapper.drag-active .file-upload-label {
+  border-color: rgba(100, 200, 255, 0.8);
+  background-color: rgba(50, 50, 80, 0.7);
+  box-shadow: 0 0 15px rgba(100, 200, 255, 0.3);
+}
+
+.uplo-wrapper .file-upload-form {
+  width: 100%;
+  background-color: transparent;
+}
+
+.uplo-wrapper .file-upload-label {
+  width: 100%;
+  cursor: pointer;
+  background-color: rgba(30, 30, 40, 0.6);
+  border: 2px dashed rgba(100, 200, 255, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+.uplo-wrapper .file-upload-label:hover {
+  border-color: rgba(100, 200, 255, 0.6);
+  background-color: rgba(40, 40, 60, 0.7);
+}
+
+.uplo-wrapper .file-upload-design svg {
+  height: 40px;
+  fill: rgba(100, 200, 255, 0.7);
+  margin-bottom: 12px;
+}
+
+.uplo-wrapper .browse-button {
+  background-color: rgba(100, 200, 255, 0.3);
+  color: white;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.uplo-wrapper .browse-button:hover {
+  background-color: rgba(100, 200, 255, 0.5);
+}
+
 .key-control {
   background-color: rgba(100, 100, 140, 0.9);
   padding: 1px 3px;
