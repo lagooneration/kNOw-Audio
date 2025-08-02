@@ -398,11 +398,40 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
   const handleAddAudio = useCallback(async (file: File) => {
     try {
       await addAudioFile(file);
+      
+      // After adding a file, recalculate the max duration for all audio files
+      setTimeout(() => {
+        let maxDuration = 0;
+        playerRefs.current.forEach((player) => {
+          if (player.buffer && player.buffer.duration > maxDuration) {
+            maxDuration = player.buffer.duration;
+          }
+        });
+        
+        if (maxDuration > 0) {
+          setTotalDuration(maxDuration);
+        }
+      }, 500); // Give a short delay for the audio to load
     } catch (error) {
       console.error("Error adding audio file:", error);
     }
   }, [addAudioFile]);
   
+  // Track the maximum duration among all loaded audio files
+  useEffect(() => {
+    // Find the maximum duration among all players
+    let maxDuration = 0;
+    
+    playerRefs.current.forEach((player) => {
+      if (player.buffer && player.buffer.duration > maxDuration) {
+        maxDuration = player.buffer.duration;
+      }
+    });
+    
+    if (maxDuration > 0) {
+      setTotalDuration(maxDuration);
+    }
+  }, [library.items]);
   // Add initial audio if provided
   useEffect(() => {
     if (audioData && audioData.file) {
@@ -412,6 +441,107 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     }
   }, [audioData, handleAddAudio]);
   
+  // Track the maximum duration among all loaded audio files and handle time updates
+  const updateTimeTracking = useCallback(() => {
+    if (!isPlaying) return;
+    
+    // Find the maximum duration among all players
+    let maxDuration = 0;
+    let currentTimeValue = 0;
+    let longestDurationPlayerId = '';
+    
+    // First find the longest duration track
+    playerRefs.current.forEach((player, id) => {
+      try {
+        // Only check players that are loaded
+        if (player.buffer) {
+          if (player.buffer.duration > maxDuration) {
+            maxDuration = player.buffer.duration;
+            longestDurationPlayerId = id;
+          }
+        }
+      } catch (error: unknown) {
+        // Ignore errors from players that might be in an invalid state
+        console.debug("Error getting player state:", error);
+      }
+    });
+    
+    // Get current time from the player with the longest duration if playing
+    if (isPlaying && longestDurationPlayerId) {
+      try {
+        const longestPlayer = playerRefs.current.get(longestDurationPlayerId);
+        if (longestPlayer && longestPlayer.state === "started") {
+          // Get the current time of the longest player
+          currentTimeValue = longestPlayer.now() % maxDuration; // Handle looping
+          
+          // If we're near the end of the track, prepare for looping or stopping
+          if (currentTimeValue > maxDuration - 0.1) {
+            currentTimeValue = 0;
+            
+            // Handle what happens at the end - loop back to beginning
+            console.log("End of track reached, looping back to beginning");
+            
+            // Optional: implement auto-stop at end by calling togglePlayback()
+            // if you want playback to stop at the end instead of looping
+          }
+          
+          // Ensure all other players are in sync with the longest one
+          playerRefs.current.forEach((player, id) => {
+            if (id !== longestDurationPlayerId && player.buffer && player.state === "started") {
+              try {
+                // Calculate normalized position
+                const normalizedPosition = currentTimeValue / maxDuration;
+                const expectedPlayerTime = normalizedPosition * player.buffer.duration;
+                const actualPlayerTime = player.now() % player.buffer.duration;
+                
+                // If the difference is too large, re-sync this player
+                if (Math.abs(actualPlayerTime - expectedPlayerTime) > 0.1) {
+                  console.log(`Re-syncing player ${id}: expected=${expectedPlayerTime.toFixed(2)}s, actual=${actualPlayerTime.toFixed(2)}s`);
+                  player.seek(expectedPlayerTime);
+                }
+              } catch (error) {
+                // Ignore sync errors
+                console.debug(`Error syncing player ${id}:`, error);
+              }
+            }
+          });
+        }
+      } catch (error: unknown) {
+        console.debug("Error getting player time:", error);
+      }
+    }
+    
+    // Update the state with the new values
+    if (maxDuration > 0) {
+      setTotalDuration(maxDuration);
+      
+      if (isPlaying) {
+        setCurrentTime(currentTimeValue);
+      }
+    }
+    
+    // Continue the animation loop if playing
+    if (isPlaying) {
+      animationRef.current = requestAnimationFrame(updateTimeTracking);
+    }
+  }, [isPlaying]);
+  
+  // Start or stop time tracking when play state changes
+  useEffect(() => {
+    if (isPlaying) {
+      // Start the animation loop for time tracking
+      updateTimeTracking();
+    } else if (animationRef.current) {
+      // Stop the animation loop
+      cancelAnimationFrame(animationRef.current);
+    }
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isPlaying, updateTimeTracking]);
   // Toggle play/pause for all audio sources
   const togglePlayback = useCallback(() => {
     const newIsPlaying = !isPlaying;
@@ -427,7 +557,23 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
           analyzerRef.current.toDestination();
         }
         
-        // Start all players with proper spatial positioning
+        // Find the longest audio track to use as a reference
+        let maxDuration = 0;
+        let currentPlayTime = currentTime;
+        
+        // Make sure we don't exceed the longest track's duration
+        playerRefs.current.forEach((player) => {
+          if (player.buffer && player.buffer.duration > maxDuration) {
+            maxDuration = player.buffer.duration;
+          }
+        });
+        
+        // Ensure current playback time is valid
+        if (currentPlayTime > maxDuration) {
+          currentPlayTime = 0;
+        }
+        
+        // Start all players with proper spatial positioning and synchronized timing
         playerRefs.current.forEach((player, id) => {
           try {
             // Find the spatial data for this player
@@ -468,10 +614,23 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
                 panner.toDestination();
               }
               
-              // Start playback with synchronized timing
-              if (player.state !== "started") {
-                console.log(`Starting playback for audio source ${id}`);
-                player.start();
+              // Calculate normalized seek position based on the longest track
+              // This ensures all tracks stay in sync relative to their position in the overall timeline
+              if (player.buffer) {
+                const normalizedPosition = currentPlayTime / maxDuration;
+                const playerStartTime = normalizedPosition * player.buffer.duration;
+                
+                // Start playback with synchronized timing
+                if (player.state !== "started") {
+                  console.log(`Starting playback for audio source ${id} at position ${playerStartTime}`);
+                  player.start();
+                  player.seek(playerStartTime);
+                }
+              } else {
+                // If no buffer yet (still loading), just start the player
+                if (player.state !== "started") {
+                  player.start();
+                }
               }
             }
           } catch (error) {
@@ -507,7 +666,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
         prev.map(source => ({ ...source, isPlaying: false }))
       );
     }
-  }, [isPlaying, spatialAudioSources]);
+  }, [isPlaying, spatialAudioSources, currentTime]);
   
   // Toggle effects
   const toggleEffect = useCallback((effect: keyof typeof effects) => {
@@ -623,7 +782,11 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
             console.log(`Audio ${id} loaded for spatial positioning`);
             // Set total duration once loaded
             if (player && player.buffer) {
-              setTotalDuration(player.buffer.duration);
+              // Update max duration if this file is longer
+              const newDuration = player.buffer.duration;
+              if (newDuration > totalDuration) {
+                setTotalDuration(newDuration);
+              }
             }
           }
         });
@@ -687,7 +850,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     
     // Select this audio
     selectAudioFile(id);
-  }, [library.items, spatialAudioSources, isPlaying, selectAudioFile, handleAudioPlaced, playbackSpeed]);
+  }, [library.items, spatialAudioSources, isPlaying, selectAudioFile, handleAudioPlaced, playbackSpeed, totalDuration]);
   
   // Handle selecting an audio in the 3D scene
   const handleAudioSelected = useCallback((id: string) => {
@@ -796,6 +959,85 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
     });
   }, [handleAudioPlaced]);
 
+  // Handle seeking to a specific time
+  const handleSeek = useCallback((time: number) => {
+    // Store current playback state
+    const wasPlaying = isPlaying;
+    
+    // If playing, temporarily pause to avoid timing issues during seek
+    if (wasPlaying) {
+      // Instead of stopping the players, we'll just prepare for repositioning
+      // We'll restart them after seeking
+      console.log("Pausing players for seek operation");
+    }
+    
+    // Find the longest audio track
+    let maxDuration = 0;
+    
+    playerRefs.current.forEach((player) => {
+      if (player.buffer && player.buffer.duration > maxDuration) {
+        maxDuration = player.buffer.duration;
+      }
+    });
+    
+    // Clamp time to valid range
+    const clampedTime = Math.max(0, Math.min(time, maxDuration));
+    
+    // Calculate normalized position (0-1) of the seek point relative to max duration
+    const normalizedPosition = clampedTime / maxDuration;
+    console.log(`Seeking to normalized position: ${normalizedPosition} (${clampedTime}s / ${maxDuration}s)`);
+    
+    // Update all players with the new position
+    playerRefs.current.forEach((player, id) => {
+      try {
+        if (player.buffer) {
+          // Calculate the appropriate time for this specific player based on its duration
+          const playerTime = normalizedPosition * player.buffer.duration;
+          const seekTime = Math.min(playerTime, player.buffer.duration);
+          
+          console.log(`Setting player ${id} to position: ${seekTime}s / ${player.buffer.duration}s`);
+          
+          // If player was already started, we need to restart it at the new position
+          const playerWasStarted = player.state === "started";
+          
+          if (playerWasStarted) {
+            // For players that were playing, stop and restart at new position
+            player.stop();
+            player.start();
+            player.seek(seekTime);
+            
+            // If we're not supposed to be playing, stop it again
+            if (!wasPlaying) {
+              setTimeout(() => player.stop(), 10);
+            }
+          } else {
+            // For stopped players, just set the seek position
+            player.seek(seekTime);
+            
+            // If we should be playing, start the player
+            if (wasPlaying) {
+              player.start();
+            }
+          }
+        }
+      } catch (error: unknown) {
+        console.error(`Error seeking player ${id}:`, error);
+      }
+    });
+    
+    // Update current time display
+    setCurrentTime(clampedTime);
+    
+    // Update time tracking
+    if (wasPlaying) {
+      // Restart animation frame loop for time tracking
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      animationRef.current = requestAnimationFrame(updateTimeTracking);
+    }
+  }, [isPlaying, updateTimeTracking]);
+
   return (
     <div className="visualization-container flex flex-col h-screen w-full dark text-foreground">
       <div className="flex flex-1 overflow-hidden relative">
@@ -868,6 +1110,7 @@ export function AudioEditor({ audioData }: AudioEditorProps) {
         totalDuration={totalDuration}
         isPlaying={isPlaying}
         onPlayPause={togglePlayback}
+        onSeek={handleSeek}
       />
     </div>
   );

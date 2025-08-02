@@ -1,10 +1,12 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
+import { BlendFunction } from 'postprocessing';
 import * as THREE from 'three';
 import * as Tone from 'tone';
 import { type SpatialAudioData, type AudioPlacement } from '../../types/spatial-audio';
-import { createAudioBlobMaterial, updateAudioBlobShader } from './audio-blob-shader';
+import { createPerlinNoiseBlobMaterial, updatePerlinNoiseBlobShader } from './perlin-noise-blob-shader';
 import { AudioListener } from './audio-listener';
 
 interface AudioBlobProps {
@@ -46,7 +48,8 @@ function AudioBlob({
   // Create shader material on mount
   useEffect(() => {
     if (meshRef.current) {
-      const material = createAudioBlobMaterial(color, isPlaying);
+      // Use the Perlin noise blob material instead of the regular blob material
+      const material = createPerlinNoiseBlobMaterial(color, isPlaying);
       meshRef.current.material = material;
       materialRef.current = material;
     }
@@ -66,22 +69,15 @@ function AudioBlob({
         fftData = audioData || new Float32Array(512);
       }
       
-      updateAudioBlobShader(
+      // Use the new Perlin noise blob shader updater
+      updatePerlinNoiseBlobShader(
         materialRef.current,
         fftData,
         isPlaying,
         state.clock.elapsedTime
       );
     }
-    
-    // Simple scale animation as fallback if shader doesn't work
-    if (isPlaying && !materialRef.current) {
-      meshRef.current.scale.x = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.1;
-      meshRef.current.scale.y = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.1;
-      meshRef.current.scale.z = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.1;
-    } else if (!isPlaying && !materialRef.current) {
-      meshRef.current.scale.set(1, 1, 1);
-    }
+    // Note: Removed scale animation as we're only using shader-based animation
     
     // Handle dragging
     if (isDragging) {
@@ -95,17 +91,29 @@ function AudioBlob({
     }
   });
   
-  const handlePointerDown = () => {
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Prevent event propagation to ensure we don't trigger other events
+    e.stopPropagation();
+    
     if (disableDragging) {
       onClick();
       return;
     }
+    
+    // First select the audio blob
+    onClick();
+    
+    // Then enable dragging - capture the pointer to ensure all subsequent events go to this element
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
     onDragStart();
     gl.domElement.style.cursor = 'grabbing';
   };
   
-  const handlePointerUp = () => {
+  const handlePointerUp = (e: React.PointerEvent) => {
+    // Release pointer capture
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    
     if (isDragging) {
       setIsDragging(false);
       onDragEnd();
@@ -141,20 +149,36 @@ function AudioBlob({
       {/* Audio source blob */}
       <mesh
         ref={meshRef}
-        onClick={onClick}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
+        onPointerMove={(e) => {
+          if (isDragging) {
+            e.stopPropagation();
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(plane.current, intersection.current);
+            onDrag({
+              x: intersection.current.x,
+              y: intersection.current.y,
+              z: intersection.current.z
+            });
+          }
+        }}
       >
-        <sphereGeometry args={[0.5, 32, 32]} />
+        {/* Use an icosahedron for better Perlin noise displacement, but with moderate detail for wireframe clarity */}
+        <icosahedronGeometry args={[0.5, 4]} />
         {/* This material will be replaced by the shader in useEffect */}
         <meshStandardMaterial 
           color={color} 
           transparent 
           opacity={0.8} 
           emissive={color}
-          emissiveIntensity={isPlaying ? 0.5 : 0.2}
+          emissiveIntensity={isPlaying ? 0.6 : 0.2}
         />
       </mesh>
       
@@ -176,6 +200,51 @@ function AudioBlob({
       >
         {name}
       </Text>
+    </group>
+  );
+}
+
+// Camera placeholder indicator for 2D view
+function CameraPlaceholder() {
+  const { camera } = useThree();
+  const meshRef = useRef<THREE.Group>(null);
+  
+  useFrame(() => {
+    if (meshRef.current) {
+      // Position the placeholder on the ground (y=0) directly below the camera
+      meshRef.current.position.x = camera.position.x;
+      meshRef.current.position.z = camera.position.z;
+      
+      // Calculate rotation based on camera's horizontal direction
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      const horizontalDirection = new THREE.Vector3(direction.x, 0, direction.z).normalize();
+      meshRef.current.rotation.y = Math.atan2(horizontalDirection.x, horizontalDirection.z);
+    }
+  });
+  
+  return (
+    <group position={[0, 0.05, 0]}>
+      {/* Camera position indicator with all components in one group for consistent movement */}
+      <group ref={meshRef}>
+        {/* Main camera position marker */}
+        <mesh>
+          <cylinderGeometry args={[0.3, 0.3, 0.02, 16]} />
+          <meshBasicMaterial color="#22DDAA" transparent opacity={0.7} />
+        </mesh>
+        
+        {/* Direction indicator */}
+        <mesh position={[0, 0, -0.4]}>
+          <coneGeometry args={[0.15, 0.3, 8]} />
+          <meshBasicMaterial color="#22DDAA" transparent opacity={0.7} />
+        </mesh>
+        
+        {/* Line connecting the camera position to the direction indicator */}
+        <mesh position={[0, 0, -0.2]}>
+          <boxGeometry args={[0.05, 0.01, 0.4]} />
+          <meshBasicMaterial color="#22DDAA" transparent opacity={0.7} />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -235,14 +304,15 @@ function WASDControls() {
   const rotateSpeed = useRef(0.02);
   const mouseDown = useRef(false);
   const lastMousePosition = useRef({ x: 0, y: 0 });
-  const cursorPanningActive = useRef(true);
+  const cursorPanningActive = useRef(false); // Disable cursor panning by default for free roam
+  const fixedHeight = useRef(0.5); // Set camera at the same height as audio blobs
   
-  // Set initial camera angle (slightly elevated and tilted)
+  // Set initial camera angle (parallel to the grid)
   useEffect(() => {
-    // Position the camera at an angle (not completely horizontal)
-    camera.position.set(0, 5, 10);
-    // Tilt the camera down slightly
-    camera.rotation.x = -Math.PI / 12; // -15 degrees
+    // Position the camera at a higher position to see the grid from above
+    camera.position.set(0, fixedHeight.current, 8); // Maintain the same distance
+    // Set camera to look parallel to the grid (no tilt)
+    camera.rotation.x = 0; // 0 degrees - horizontal view
   }, [camera]);
   
   useEffect(() => {
@@ -255,7 +325,7 @@ function WASDControls() {
     };
     
     const handleMouseDown = (e: MouseEvent) => {
-      if (e.button === 2) { // Right mouse button
+      if (e.button === 2) { // Right mouse button only
         mouseDown.current = true;
         lastMousePosition.current = { x: e.clientX, y: e.clientY };
         gl.domElement.style.cursor = 'grabbing';
@@ -267,20 +337,17 @@ function WASDControls() {
       if (e.button === 2) { // Right mouse button
         mouseDown.current = false;
         gl.domElement.style.cursor = 'auto';
-        cursorPanningActive.current = true; // Re-enable cursor panning
+        // Keep cursor panning disabled for free roam
       }
     };
     
     const handleMouseMove = (e: MouseEvent) => {
       if (mouseDown.current) {
         const dx = e.clientX - lastMousePosition.current.x;
-        const dy = e.clientY - lastMousePosition.current.y;
         
-        if (dx !== 0 || dy !== 0) {
+        if (dx !== 0) {
+          // Only apply horizontal rotation (left/right)
           camera.rotation.y -= dx * rotateSpeed.current;
-          camera.rotation.x -= dy * rotateSpeed.current;
-          // Clamp vertical rotation to avoid flipping
-          camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
         }
         
         lastMousePosition.current = { x: e.clientX, y: e.clientY };
@@ -313,59 +380,41 @@ function WASDControls() {
     const direction = new THREE.Vector3();
     camera.getWorldDirection(direction);
     
+    // We'll use this for horizontal movement only (ignore y component)
+    const horizontalDirection = new THREE.Vector3(direction.x, 0, direction.z).normalize();
+    
     // Get right vector by crossing direction with up vector
     const right = new THREE.Vector3();
     right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
     
-    // Move forward/backward
+    // Calculate movement vector based on keys pressed
+    const movementVector = new THREE.Vector3(0, 0, 0);
+    
+    // Move forward/backward (in the horizontal plane only)
     if (keys.current['w']) {
-      camera.position.addScaledVector(direction, moveSpeed.current);
+      movementVector.add(horizontalDirection.clone().multiplyScalar(moveSpeed.current));
     }
     if (keys.current['s']) {
-      camera.position.addScaledVector(direction, -moveSpeed.current);
+      movementVector.add(horizontalDirection.clone().multiplyScalar(-moveSpeed.current));
     }
     
     // Strafe left/right
     if (keys.current['a']) {
-      camera.position.addScaledVector(right, -moveSpeed.current);
+      movementVector.add(right.clone().multiplyScalar(-moveSpeed.current));
     }
     if (keys.current['d']) {
-      camera.position.addScaledVector(right, moveSpeed.current);
+      movementVector.add(right.clone().multiplyScalar(moveSpeed.current));
     }
     
-    // Up/down movement
-    if (keys.current[' ']) { // Space to move up
-      camera.position.y += moveSpeed.current;
-    }
-    if (keys.current['shift']) { // Shift to move down
-      camera.position.y -= moveSpeed.current;
-    }
+    // Apply movement directly to camera position
+    camera.position.add(movementVector);
     
-    // Cursor-based camera panning
-    if (cursorPanningActive.current) {
-      // Get cursor position
-      const cursor = new THREE.Vector2();
-      cursor.x = (gl.domElement.offsetWidth / 2 - gl.domElement.getBoundingClientRect().left);
-      cursor.y = (gl.domElement.offsetHeight / 2 - gl.domElement.getBoundingClientRect().top);
-      
-      // Calculate cursor distance from center in each dimension (normalized -1 to 1)
-      const mousePosX = gl.domElement.offsetWidth / 2 - cursor.x;
-      const mousePosY = gl.domElement.offsetHeight / 2 - cursor.y;
-      
-      // Calculate panning speed based on cursor position
-      // The closer to the edge, the faster the panning
-      const panX = (mousePosX / (gl.domElement.offsetWidth / 2)) * 0.01;
-      const panY = (mousePosY / (gl.domElement.offsetHeight / 2)) * 0.005;
-      
-      // Apply panning if mouse is within the canvas
-      if (Math.abs(mousePosX) < gl.domElement.offsetWidth / 2 && 
-          Math.abs(mousePosY) < gl.domElement.offsetHeight / 2) {
-        camera.rotation.y += panX;
-        camera.rotation.x += panY;
-        // Clamp vertical rotation to avoid flipping
-        camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-      }
-    }
+    // Lock camera height at fixed position
+    camera.position.y = fixedHeight.current;
+    
+    // Ensure camera remains parallel to the grid
+    camera.rotation.x = 0; // Keep horizontal (parallel to grid)
+    camera.rotation.z = 0; // Prevent any roll
   });
   
   return null;
@@ -385,7 +434,6 @@ export function SpatialAudioScene({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [dropPosition, setDropPosition] = useState({ x: 0, y: 0 });
   const [fftData, setFftData] = useState<Float32Array | null>(null);
-  const [disableBlobDragging, setDisableBlobDragging] = useState(false);
   const [showNavigationHelp] = useState(true); // Always show navigation help
   
   // Fetch FFT data periodically when playing
@@ -395,7 +443,32 @@ export function SpatialAudioScene({
     const updateFFT = () => {
       try {
         const data = analyzer.getValue() as Float32Array;
-        setFftData(data);
+        
+        // Apply some pre-processing to the FFT data for better visualization
+        const processedData = new Float32Array(data.length);
+        for (let i = 0; i < data.length; i++) {
+          // Convert dB values to normalized range
+          let value = Math.max(0, (data[i] + 140) / 60);
+          
+          // Apply frequency-dependent boosts
+          if (i > 20 && i < 100) {
+            value *= 1.8; // Boost mid-range
+          } else if (i > 100) {
+            value *= 2.0; // Boost highs
+          } else {
+            value *= 1.5; // Boost lows
+          }
+          
+          // Apply minimum value to ensure some activity
+          value = Math.max(value, 0.05);
+          
+          // Clamp to prevent excessive values
+          value = Math.min(value, 1.0);
+          
+          processedData[i] = value;
+        }
+        
+        setFftData(processedData);
       } catch (error) {
         console.error("Error getting FFT data:", error);
       }
@@ -408,14 +481,6 @@ export function SpatialAudioScene({
       clearInterval(intervalId);
     };
   }, [isPlaying, analyzer]);
-  
-  // Control whether blob dragging is enabled
-  useEffect(() => {
-    // Disable blob dragging when a blob is placed for the first time
-    if (audioSources.length > 0 && !disableBlobDragging) {
-      setDisableBlobDragging(true);
-    }
-  }, [audioSources, disableBlobDragging]);
 
   // Handle drops from audio library
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -488,25 +553,25 @@ export function SpatialAudioScene({
             <div className="mr-1">Move:</div>
             <span className="key-control">W</span><span className="key-control">A</span><span className="key-control">S</span><span className="key-control">D</span>
             <div className="mx-1 h-3 w-px bg-gray-500"></div>
-            <span className="key-control">Space</span>
-            <span className="mx-1">Up</span>
-            <div className="mx-1 h-3 w-px bg-gray-500"></div>
-            <span className="key-control">Shift</span>
-            <span className="mx-1">Down</span>
+            <div className="mr-1">Rotate:</div>
+            <span className="key-control">Right Click + Drag Horizontally</span>
           </div>
         </div>
       )}
       
       <Canvas 
         camera={{ 
-          position: [0, 5, 10], 
-          fov: 60,
+          position: [0, 0.5, 8], 
+          fov: 75,  // Wider field of view for better visibility of blobs
           near: 0.1,
-          far: 1000
+          far: 1000,
+          // Don't set any lookAt property to avoid constraining the camera
         }}
         onCreated={({ gl }) => {
-          gl.setClearColor(new THREE.Color('#1a1a2e'));
+          gl.setClearColor(new THREE.Color('#0a0a15')); // Darker background
           gl.shadowMap.enabled = true;
+          gl.shadowMap.type = THREE.PCFSoftShadowMap;
+          gl.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Better performance
         }}
       >
         <ambientLight intensity={0.4} />
@@ -518,17 +583,40 @@ export function SpatialAudioScene({
           shadow-mapSize-height={1024} 
         />
         
-        {/* Add fog for depth perception */}
-        <fog attach="fog" args={['#1a1a2e', 15, 40]} />
+        {/* Add a subtle point light for more balanced lighting on blobs */}
+        <pointLight position={[0, 3, 0]} intensity={0.4} color="#5555dd" />
+        
+        {/* Add volumetric fog for depth perception */}
+        <fog attach="fog" args={['#0a0a15', 15, 35]} />
         
         {/* Add WASD controls */}
         <WASDControls />
+        
+        {/* Add post-processing effects */}
+        <EffectComposer>
+          <Bloom 
+            intensity={0.4} 
+            luminanceThreshold={0.2} 
+            luminanceSmoothing={0.9} 
+            mipmapBlur
+            radius={0.5}
+          />
+          <Vignette 
+            darkness={0.4} 
+            offset={0.2} 
+            eskil={false} 
+            blendFunction={BlendFunction.NORMAL} 
+          />
+        </EffectComposer>
         
         {/* Audio listener to update audio based on camera */}
         <AudioListener />
         
         {/* Scene elements */}
         <GridFloor />
+        
+        {/* Camera placeholder on ground */}
+        <CameraPlaceholder />
         
         {/* Audio blobs */}
         {audioSources.map((source) => (
@@ -541,7 +629,7 @@ export function SpatialAudioScene({
             isSelected={!!source.isSelected}
             audioData={fftData || audioAnalysisData}
             analyzer={analyzer}
-            disableDragging={disableBlobDragging}
+            disableDragging={false} // Always allow dragging for all audio blobs
             onClick={() => onAudioSelected(source.id)}
             onDragStart={() => {
               onAudioPlaced({
@@ -569,6 +657,7 @@ export function SpatialAudioScene({
         
         {/* Controls */}
         <OrbitControls 
+          enabled={false} /* Disable OrbitControls completely for free roam */
           enableDamping={false}
           enableRotate={false} 
           enableZoom={true} 

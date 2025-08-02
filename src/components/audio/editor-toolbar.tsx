@@ -1,5 +1,6 @@
 import '../audio/editor-styles.css';
 import '../audio/play-button.css';
+import '../audio/time-slider.css';
 import Play from '../ui/play';
 
 // Format time in seconds to mm:ss format
@@ -18,6 +19,7 @@ interface EditorToolbarProps {
   totalDuration?: number;
   isPlaying?: boolean;
   onPlayPause?: () => void;
+  onSeek?: (time: number) => void;
 }
 
 export function EditorToolbar({ 
@@ -28,7 +30,8 @@ export function EditorToolbar({
   currentTime = 0,
   totalDuration = 0,
   isPlaying = false,
-  onPlayPause = () => {}
+  onPlayPause = () => {},
+  onSeek = () => {}
 }: EditorToolbarProps) {
   return (
     <div className="bg-background/60 backdrop-blur-md border-t border-border h-14 flex items-center px-4 justify-between">
@@ -48,7 +51,7 @@ export function EditorToolbar({
         </div>
         
         <div className="h-6 w-px bg-border"></div>
-         
+        
         {/* Play/Pause Button */}
         <div className="flex items-center justify-center w-12 mx-2 editor-play-button">
           <Play 
@@ -60,11 +63,57 @@ export function EditorToolbar({
         
         <div className="h-6 w-px bg-border"></div>
         
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-muted-foreground">Time:</span>
-          <span className="text-xs font-mono">{formatTime(currentTime)}</span>
-          <span className="text-xs text-muted-foreground">/</span>
-          <span className="text-xs font-mono">{formatTime(totalDuration)}</span>
+        <div className="flex flex-col space-y-2 w-64">
+          
+          <div 
+            className="time-slider group"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const clickPosition = e.clientX - rect.left;
+              const percentage = clickPosition / rect.width;
+              const seekTime = percentage * totalDuration;
+              onSeek(seekTime);
+            }}
+            onMouseMove={(e) => {
+              const timeDisplay = e.currentTarget.querySelector('.time-display') as HTMLElement;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const position = e.clientX - rect.left;
+              const percentage = Math.max(0, Math.min(1, position / rect.width));
+              if (timeDisplay) {
+                timeDisplay.style.left = `${position}px`;
+                timeDisplay.textContent = formatTime(percentage * totalDuration);
+                timeDisplay.classList.add('visible');
+              }
+            }}
+            onMouseLeave={(e) => {
+              const timeDisplay = e.currentTarget.querySelector('.time-display') as HTMLElement;
+              if (timeDisplay) {
+                timeDisplay.classList.remove('visible');
+              }
+            }}
+          >
+            <div 
+              className="time-slider-progress" 
+              style={{ 
+                width: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%`,
+                transition: isPlaying ? 'width 0.1s linear' : 'none'
+              }}
+            ></div>
+            <div 
+              className="time-slider-handle"
+              style={{ 
+                left: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%`,
+                transition: isPlaying ? 'left 0.1s linear' : 'none',
+                display: totalDuration > 0 ? 'block' : 'none'
+              }}
+            ></div>
+            <div className="time-display"></div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-primary">{formatTime(currentTime)}</span>
+            <span className="text-xs text-muted-foreground mx-1"></span>
+            <span className="text-xs font-mono">{formatTime(totalDuration)}</span>
+          </div>
         </div>
       </div>
       

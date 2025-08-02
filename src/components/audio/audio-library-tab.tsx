@@ -78,13 +78,24 @@ export function AudioLibraryTab({
         {audioItems.length < maxFiles ? (
           <div 
             className={`uplo-wrapper ${dragActive ? 'drag-active' : ''}`}
-            onClick={() => document.getElementById('file-upload-input')?.click()}
             onDragEnter={handleDrag}
             onDragOver={handleDrag}
             onDragLeave={handleDrag}
             onDrop={handleDrop}
           >
-            <Uplo />
+            <div 
+              className="w-full h-full flex items-center justify-center"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const fileInput = document.getElementById('file-upload-input') as HTMLInputElement;
+                if (fileInput) {
+                  fileInput.click();
+                }
+              }}
+            >
+              <Uplo />
+            </div>
             <input 
               id="file-upload-input"
               type="file"
