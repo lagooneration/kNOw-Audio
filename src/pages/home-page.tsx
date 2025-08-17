@@ -274,8 +274,17 @@ export function HomePage() {
                     audio engineers, and music enthusiasts.
                   </p>
                 </div>
-                <div className="flex justify-center opacity-70 hover:opacity-100 transition-opacity duration-300">
-                  <Gitbutton repoUrl="https://github.com/lagooneration/know-audio" />
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                  <Button 
+                    className="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white"
+                    size="lg"
+                    onClick={() => navigate('/live-audio')}
+                  >
+                    Try Live Audio
+                  </Button>
+                  <div className="opacity-70 hover:opacity-100 transition-opacity duration-300">
+                    <Gitbutton repoUrl="https://github.com/lagooneration/know-audio" />
+                  </div>
                 </div>
               </div>
             </CardContent>

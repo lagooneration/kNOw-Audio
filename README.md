@@ -133,5 +133,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgements
 
 - The Web Audio API community
-- Three.js and React Three Fiber contributors
-- All open source audio processing libraries that made this project possible
+- Claude Sonnet 3.5, 3.7
+- Three.js and React Three Fiber
