@@ -1,9 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { type AudioData } from '../types/audio';
 import { type AudioLibrary, type AudioLibraryItem, type SpatialAudioData } from '../types/spatial-audio';
 import { processAudioFile } from '../utils/audio-processing';
-import { createSpatialAudioSource, updateSpatialAudioPosition } from '../utils/spatial-audio-processing';
+import { createSpatialAudioSource } from '../utils/spatial-audio-processing';
 
 const MAX_AUDIO_FILES = 3;
 

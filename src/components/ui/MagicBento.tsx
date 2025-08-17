@@ -227,7 +227,7 @@ const ParticleCard: React.FC<{
         });
       }, index * 100);
 
-      timeoutsRef.current.push(timeoutId);
+      timeoutsRef.current.push(timeoutId as unknown as number);
     });
   }, [initializeParticles]);
 

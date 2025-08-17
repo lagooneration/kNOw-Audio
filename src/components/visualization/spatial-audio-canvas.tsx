@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
-import type { SpatialAudioData, AudioBlobVisualization, AudioPlacement } from '../../types/spatial-audio';
+import type { SpatialAudioData, AudioBlobVisualization } from '../../types/spatial-audio';
 import { SpatialAudioScene } from './spatial-audio-scene';
 
 // Shader for analytical visualization overlay

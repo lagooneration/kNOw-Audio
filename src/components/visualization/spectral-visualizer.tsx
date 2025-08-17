@@ -79,7 +79,7 @@ export default function SpectralVisualizer({ track1, track2, width, height }: Sp
     analyser2: AnalyserNode;
     dataArray1: Uint8Array;
     dataArray2: Uint8Array;
-  }>();
+  }>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;

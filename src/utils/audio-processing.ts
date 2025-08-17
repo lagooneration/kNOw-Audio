@@ -67,7 +67,7 @@ export function extractFeatures(audioBuffer: AudioBuffer): AudioFeatures {
   const spectrogram = generateSpectrogram(audioBuffer);
   
   // Detect time markers (placeholder)
-  const timeMarkers = detectTimeMarkers(audioBuffer, beats, frequencyPeaks);
+  const timeMarkers = detectTimeMarkers(beats, frequencyPeaks);
   
   return {
     timeMarkers,
@@ -218,7 +218,6 @@ function generateSpectrogram(audioBuffer: AudioBuffer) {
 
 // Detect time markers (placeholder implementation)
 function detectTimeMarkers(
-  audioBuffer: AudioBuffer,
   beats: Beat[],
   frequencyPeaks: FrequencyPeak[]
 ): AudioMarker[] {
@@ -269,13 +268,13 @@ export function analyzeAudio(audioBuffer: AudioBuffer, features: AudioFeatures):
   // Simplified analysis - in a real application, you'd use machine learning models
   
   // Detect speech segments based on frequency content
-  const speechSegments = detectSpeechSegments(audioBuffer, features);
+  const speechSegments = detectSpeechSegments(features);
   
   // Detect music segments based on rhythmic features
   const musicSegments = detectMusicSegments(audioBuffer, features);
   
   // Detect environmental sounds
-  const environmentalSoundSegments = detectEnvironmentalSounds(audioBuffer, features);
+  const environmentalSoundSegments = detectEnvironmentalSounds(features);
   
   // Analyze dominant frequency ranges
   const dominantFrequencyRanges = analyzeDominantFrequencyRanges(features);
@@ -303,7 +302,7 @@ export function analyzeAudio(audioBuffer: AudioBuffer, features: AudioFeatures):
 }
 
 // Detect speech segments (simplified)
-function detectSpeechSegments(audioBuffer: AudioBuffer, features: AudioFeatures): TimeSegment[] {
+function detectSpeechSegments(features: AudioFeatures): TimeSegment[] {
   const segments: TimeSegment[] = [];
   const speechMarkers = features.timeMarkers.filter(marker => marker.type === 'speech');
   
@@ -379,7 +378,7 @@ function detectMusicSegments(audioBuffer: AudioBuffer, features: AudioFeatures):
 }
 
 // Detect environmental sounds (simplified)
-function detectEnvironmentalSounds(audioBuffer: AudioBuffer, features: AudioFeatures): TimeSegment[] {
+function detectEnvironmentalSounds(features: AudioFeatures): TimeSegment[] {
   const segments: TimeSegment[] = [];
   const envMarkers = features.timeMarkers.filter(marker => marker.type === 'environmental');
   

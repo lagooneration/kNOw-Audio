@@ -13,6 +13,7 @@ import {
   type Target,
   type TargetAndTransition,
   animationControls,
+  type Transition
 } from "framer-motion";
 
 function cn(...classes: (string | undefined | null | boolean)[]): string {

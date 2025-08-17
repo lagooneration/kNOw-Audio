@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Button } from '../ui/button';
 import { type AudioLibraryItem } from '../../types/spatial-audio';
 import Uplo from '../ui/uplo';

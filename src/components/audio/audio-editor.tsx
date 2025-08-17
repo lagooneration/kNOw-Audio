@@ -15,7 +15,6 @@ import { SpatialAudioScene } from '../visualization/spatial-audio-scene';
 import { useAudioLibrary } from '../../hooks/use-audio-library';
 import { type AudioData } from '../../types/audio';
 import { type AudioPlacement, type SpatialAudioData } from '../../types/spatial-audio';
-import { updateListenerPosition, updateSpatialAudioPosition } from '../../utils/spatial-audio-processing';
 
 interface AudioEditorProps {
   audioData?: AudioData;

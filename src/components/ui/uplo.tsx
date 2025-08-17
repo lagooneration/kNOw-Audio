@@ -1,4 +1,4 @@
-import { FC } from 'react'; // If you need component typing
+import type { FC } from 'react'; // If you need component typing
 import styled from 'styled-components';
 
 const Uplo: FC = () => {
