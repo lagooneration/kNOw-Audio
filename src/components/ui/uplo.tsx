@@ -1,7 +1,7 @@
-import React from 'react';
+import { FC } from 'react'; // If you need component typing
 import styled from 'styled-components';
 
-const Uplo = () => {
+const Uplo: FC = () => {
   return (
     <StyledWrapper>
       <form className="file-upload-form">

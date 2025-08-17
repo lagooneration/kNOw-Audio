@@ -1,7 +1,7 @@
-import React from 'react';
+import { FC } from 'react';
 import styled from 'styled-components';
 
-const Search = () => {
+const Search: FC = () => {
   return (
     <StyledWrapper>
       <div>

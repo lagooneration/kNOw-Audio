@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { FileUpload } from './file-upload';
 import { Button } from '../ui/button';
-import type { AudioData } from '../../types/audio';
 import type { SpatialAudioData } from '../../types/spatial-audio';
 
 interface SpatialAudioSidebarProps {

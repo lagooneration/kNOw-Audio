@@ -148,6 +148,7 @@ export function HomePage() {
                 } else if (index === 1) {
                   navigate('/mixing');
                 } else if (index === 2) {
+                  // Navigate to audio editor page
                   navigate('/editor');
                 }
               }}
